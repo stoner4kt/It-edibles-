@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Products | OG EDIBLES1738</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: "#1E4D2B", "primary-dark": "#122E19",
+            secondary: "#E5F3E7", accent: "#A56CFF", "accent-dark": "#8B4FE0",
+            "text-dark": "#333333", "text-mid": "#6B7280"
+          },
+          fontFamily: { sans: ["'Inter'", "sans-serif"] }
+        }
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { background: #fff; font-family: 'Inter', sans-serif; color: #333; }
+
+    .navbar { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(30,77,43,0.1); }
+
+    .btn-accent { background: #A56CFF; color: #fff; font-weight: 700; border-radius: 999px; transition: all 0.3s; border: 1px solid rgba(165,108,255,0.8); }
+    .btn-accent:hover { background: #8B4FE0; transform: translateY(-1px); }
+    .btn-accent:disabled { background: #ccc; border-color: #ccc; cursor: not-allowed; transform: none; }
+    .btn-primary { background: #1E4D2B; color: #fff; font-weight: 700; border-radius: 999px; transition: all 0.3s; border: 1px solid rgba(30,77,43,0.8); }
+    .btn-primary:hover { background: #122E19; }
+    .btn-outline { border: 1.5px solid rgba(30,77,43,0.2); color: #1E4D2B; border-radius: 999px; font-weight: 600; transition: all 0.3s; }
+    .btn-outline:hover { border-color: #A56CFF; color: #A56CFF; }
+
+    .product-card { border: 1px solid rgba(30,77,43,0.1); border-radius: 16px; overflow: hidden; transition: all 0.3s; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
+    .product-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(30,77,43,0.12); border-color: rgba(165,108,255,0.3); }
+    .out-of-stock { opacity: 0.65; }
+
+    .badge { position: absolute; top: 8px; left: 8px; font-size: 0.7rem; font-weight: 800; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge-instock { background: #1E4D2B; color: #fff; }
+    .badge-out { background: #ef4444; color: #fff; }
+
+    .filter-btn { border: 1px solid rgba(30,77,43,0.15); border-radius: 999px; transition: all 0.3s; font-size: 0.875rem; padding: 6px 16px; font-weight: 500; color: #555; }
+    .filter-btn.active, .filter-btn:hover { background: rgba(165,108,255,0.12); color: #A56CFF; border-color: rgba(165,108,255,0.3); }
+
+    #cart-drawer { position: fixed; top: 0; right: 0; height: 100%; width: 100%; max-width: 400px; background: #fff; z-index: 70; transform: translateX(100%); transition: transform 0.3s ease-in-out; box-shadow: -4px 0 20px rgba(0,0,0,0.1); border-left: 1px solid rgba(30,77,43,0.1); }
+    #cart-drawer.open { transform: translateX(0); }
+
+    #mobile-menu { position: fixed; top: 0; right: 0; width: 280px; height: 100%; background: #fff; z-index: 60; padding: 1.5rem; transform: translateX(100%); transition: transform 0.3s ease-in-out; box-shadow: -4px 0 20px rgba(0,0,0,0.08); }
+    #mobile-menu.open { transform: translateX(0); }
+
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(30,77,43,0.12), transparent); }
+
+    .stock-count { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 999px; background: rgba(165,108,255,0.1); color: #7C3AED; font-size: 0.68rem; font-weight: 700; }
+
+    .qty-btn { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: 700; border: 1px solid; transition: all 0.2s; cursor: pointer; }
+    .qty-btn-minus { border-color: rgba(30,77,43,0.2); color: #1E4D2B; }
+    .qty-btn-minus:hover { background: #E5F3E7; }
+    .qty-btn-plus { background: #A56CFF; border-color: #A56CFF; color: #fff; }
+    .qty-btn-plus:hover { background: #8B4FE0; }
+
+    .product-description { position: relative; max-height: 2.6rem; overflow: hidden; transition: max-height 0.25s ease; }
+    .product-description::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1rem; background: linear-gradient(to bottom, rgba(255,255,255,0), #fff); }
+    .product-description.expanded { max-height: 10rem; }
+    .product-description.expanded::after { opacity: 0; }
+
+    .products-header {
+      background-image: url('images/quality.jpg');
+      background-size: cover;
+      background-position: center;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Mobile Backdrop -->
+<div id="menu-backdrop" class="fixed inset-0 bg-black/50 z-50 hidden" onclick="closeMenu()"></div>
+
+<!-- Mobile Menu -->
+<div id="mobile-menu">
+  <div class="flex justify-between items-center mb-6 pb-4 border-b border-primary/10">
+    <img src="images/logo.jpg" alt="OG EDIBLES1738" class="h-9 rounded-full">
+    <button onclick="closeMenu()" class="text-2xl font-light text-text-dark">✕</button>
+  </div>
+  <nav class="space-y-3">
+    <a href="index.html" class="block text-lg font-medium text-text-dark hover:text-accent transition">Home</a>
+    <a href="products.html" class="block text-lg font-bold text-accent">Products</a>
+    <a href="index.html#reviews" class="block text-lg font-medium text-text-dark hover:text-accent transition">Reviews</a>
+    <a href="index.html#about" class="block text-lg font-medium text-text-dark hover:text-accent transition">Our Story</a>
+  </nav>
+</div>
+
+<!-- NAVBAR -->
+<header class="navbar sticky top-0 z-40">
+  <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between items-center h-16">
+      <a href="index.html" class="flex items-center gap-3 flex-shrink-0">
+        <img src="images/logo.jpg" alt="OG EDIBLES1738" class="h-9 rounded-full border-2 border-primary/20">
+        <span class="font-bold text-primary hidden sm:inline">OG EDIBLES<span class="text-accent">1738</span></span>
+      </a>
+      <nav class="hidden lg:flex gap-8">
+        <a href="index.html" class="font-medium text-text-mid hover:text-accent transition">Home</a>
+        <a href="products.html" class="font-bold text-accent border-b-2 border-accent pb-0.5">Products</a>
+        <a href="index.html#reviews" class="font-medium text-text-mid hover:text-accent transition">Reviews</a>
+        <a href="index.html#about" class="font-medium text-text-mid hover:text-accent transition">Our Story</a>
+      </nav>
+      <div class="flex items-center gap-3">
+        <button onclick="toggleCart()"
+          class="relative flex items-center gap-2 border border-accent/30 rounded-full px-4 py-2 text-accent font-medium hover:bg-accent/5 transition text-sm">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6l-2-2H2"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/>
+          </svg>
+          Cart
+          <span id="cart-count" class="absolute -top-2 -right-2 w-5 h-5 bg-accent text-white text-xs font-bold rounded-full flex items-center justify-center hidden">0</span>
+        </button>
+        <button onclick="toggleMenu()" class="lg:hidden p-2 text-primary">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
+
+  <!-- Page Header -->
+  <div class="mb-6 rounded-2xl overflow-hidden products-header relative min-h-[140px] flex items-end">
+    <div class="absolute inset-0 bg-gradient-to-r from-primary/85 to-accent/60"></div>
+    <div class="relative z-10 p-6 sm:p-8 flex items-end justify-between w-full">
+      <div>
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-white">Our Products</h1>
+        <p class="text-white/80 mt-1">Browse our full selection of premium cannabis products.</p>
+      </div>
+      <img src="images/logo.jpg" alt="OG EDIBLES1738" class="h-16 w-16 rounded-full border-2 border-white/40 object-cover shadow-lg hidden sm:block">
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="flex flex-wrap gap-2 mb-6">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="flower">Flower</button>
+    <button class="filter-btn" data-filter="edibles">Edibles</button>
+    <button class="filter-btn" data-filter="pre-rolls">Pre-rolls</button>
+    <button class="filter-btn" data-filter="drinks">Drinks</button>
+    <button class="filter-btn" data-filter="accessories">Accessories</button>
+    <button class="filter-btn" data-filter="live rosin">Live Rosin</button>
+  </div>
+
+  <div class="divider mb-6"></div>
+
+  <!-- Pricing note -->
+  <div id="pricing-note" class="mb-6 bg-secondary border border-primary/15 rounded-xl p-4 flex justify-between items-start gap-3">
+    <p class="text-sm text-text-mid"><span class="font-semibold text-primary">Pricing note:</span> Flower prices are per 1g unless stated otherwise. Edibles and drinks are priced per item/pack.</p>
+    <button onclick="document.getElementById('pricing-note').remove()" class="text-xs text-accent shrink-0">Got it ✕</button>
+  </div>
+
+  <!-- Social strip -->
+  <div class="mb-6 rounded-xl bg-secondary border border-primary/10 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <p class="text-sm text-text-mid">Follow OG EDIBLES1738 for drops, deals &amp; vibes.</p>
+    <div class="flex flex-wrap gap-2">
+      <a href="https://www.instagram.com/ogedibles1738" target="_blank" class="btn-accent px-4 py-1.5 text-xs">Instagram</a>
+      <a href="https://www.tiktok.com/@og.edibles" target="_blank" class="btn-primary px-4 py-1.5 text-xs">TikTok</a>
+    </div>
+  </div>
+
+  <!-- Products Grid -->
+  <div id="products-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-5">
+    <div class="col-span-2 sm:col-span-3 lg:col-span-4 xl:col-span-5 text-center py-12 text-text-mid">
+      <div class="inline-block w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin mb-3"></div>
+      <p>Loading products…</p>
+    </div>
+  </div>
+  <p id="no-products" class="text-center text-text-mid py-8 hidden">No products in this category yet.</p>
+</main>
+
+<!-- CART OVERLAY + DRAWER -->
+<div id="cart-overlay" class="fixed inset-0 bg-black/50 z-60 hidden" onclick="toggleCart()"></div>
+<div id="cart-drawer">
+  <div class="flex flex-col h-full">
+    <div class="flex justify-between items-center p-5 border-b border-primary/10">
+      <h2 class="text-xl font-extrabold text-primary">Your Cart</h2>
+      <button onclick="toggleCart()" class="text-text-mid hover:text-accent text-sm font-medium">Close ✕</button>
+    </div>
+    <div id="cart-items-list" class="flex-1 overflow-y-auto p-5 space-y-3">
+      <p class="text-center text-text-mid py-8">Your cart is empty.</p>
+    </div>
+    <div class="p-5 border-t border-primary/10 bg-secondary">
+      <div class="flex justify-between items-center mb-4">
+        <span class="font-semibold">Total</span>
+        <span id="cart-total" class="text-2xl font-extrabold text-accent">R0</span>
+      </div>
+      <button onclick="goToCheckout()" id="checkout-btn" class="btn-accent w-full py-3 text-base disabled:opacity-50" disabled>
+        Proceed to Checkout →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile Float Cart -->
+<button onclick="toggleCart()" id="float-cart-btn"
+  class="lg:hidden fixed bottom-24 right-4 z-50 btn-accent w-14 h-14 rounded-full flex items-center justify-center shadow-xl">
+  <div class="relative">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+      <path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6l-2-2H2"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/>
+    </svg>
+    <span id="float-cart-count" class="absolute -top-2 -right-2 w-5 h-5 bg-primary text-white text-xs font-bold rounded-full items-center justify-center hidden flex">0</span>
+  </div>
+</button>
+
+<!-- WhatsApp FAB -->
+<a href="https://wa.me/27000000000" target="_blank"
+   class="fixed bottom-6 right-4 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-xl bg-green-500 hover:bg-green-600 transition text-white">
+  <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M20.52 3.48A11.91 11.91 0 0012.07 0C5.44 0 .04 5.4.04 12.03c0 2.12.55 4.18 1.6 6.01L0 24l6.15-1.61a12.03 12.03 0 005.92 1.51h.01c6.63 0 12.03-5.4 12.03-12.03 0-3.21-1.25-6.23-3.59-8.39z"/></svg>
+</a>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script>
+  let allProducts = [];
+  let cart = JSON.parse(localStorage.getItem('og1738_cart') || '[]');
+  let currentFilter = 'all';
+
+  function normalizeCategory(v) {
+    return String(v||'').toLowerCase().trim().replace(/[_]+/g,' ').replace(/\s*-\s*/g,'-').replace(/\s+/g,' ');
+  }
+
+  function toggleMenu() {
+    document.getElementById('mobile-menu').classList.toggle('open');
+    document.getElementById('menu-backdrop').classList.toggle('hidden');
+  }
+  function closeMenu() {
+    document.getElementById('mobile-menu').classList.remove('open');
+    document.getElementById('menu-backdrop').classList.add('hidden');
+  }
+
+  function toggleCart() {
+    document.getElementById('cart-drawer').classList.toggle('open');
+    document.getElementById('cart-overlay').classList.toggle('hidden');
+  }
+
+  function saveCart() { localStorage.setItem('og1738_cart', JSON.stringify(cart)); }
+
+  function updateCartUI() {
+    const total = cart.reduce((s,i) => s+i.price*i.qty, 0);
+    const count = cart.reduce((s,i) => s+i.qty, 0);
+    document.getElementById('cart-total').textContent = 'R'+total;
+    document.getElementById('cart-count').textContent = count;
+    document.getElementById('float-cart-count').textContent = count;
+    if (count > 0) {
+      document.getElementById('cart-count').classList.remove('hidden');
+      document.getElementById('float-cart-count').classList.remove('hidden');
+      document.getElementById('float-cart-count').classList.add('flex');
+    } else {
+      document.getElementById('cart-count').classList.add('hidden');
+      document.getElementById('float-cart-count').classList.add('hidden');
+    }
+    document.getElementById('checkout-btn').disabled = count === 0;
+    renderCartItems();
+  }
+
+  function renderCartItems() {
+    const list = document.getElementById('cart-items-list');
+    if (!cart.length) { list.innerHTML = '<p class="text-center text-text-mid py-8">Your cart is empty.</p>'; return; }
+    list.innerHTML = cart.map((item,i) => `
+      <div class="flex gap-3 bg-secondary rounded-xl p-3 border border-primary/8">
+        <img src="${item.imageUrl||'https://placehold.co/80x80/E5F3E7/1E4D2B?text=P'}" class="w-14 h-14 object-cover rounded-lg flex-shrink-0" onerror="this.src='https://placehold.co/80x80/E5F3E7/1E4D2B?text=P'">
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-sm truncate text-text-dark">${item.name}</p>
+          <p class="text-accent font-bold text-sm">R${item.price} each</p>
+          <div class="flex items-center gap-2 mt-1.5">
+            <button onclick="changeQty(${i},-1)" class="qty-btn qty-btn-minus">−</button>
+            <span class="text-sm font-bold w-5 text-center">${item.qty}</span>
+            <button onclick="changeQty(${i},1)" class="qty-btn qty-btn-plus">+</button>
+            <button onclick="removeFromCart(${i})" class="ml-auto text-xs text-red-500 hover:text-red-700">Remove</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  function addToCart(product) {
+    const ex = cart.find(i => i.id === product.id);
+    if (ex) ex.qty++;
+    else cart.push({...product, qty:1});
+    saveCart(); updateCartUI();
+    const btn = document.getElementById('add-btn-'+product.id);
+    if (btn) {
+      btn.textContent = 'Added! ✓'; btn.style.background = '#1E4D2B';
+      setTimeout(() => { btn.textContent = 'Add to Cart'; btn.style.background = ''; }, 1200);
+    }
+  }
+
+  function changeQty(i, delta) {
+    cart[i].qty += delta;
+    if (cart[i].qty <= 0) cart.splice(i,1);
+    saveCart(); updateCartUI();
+  }
+
+  function removeFromCart(i) { cart.splice(i,1); saveCart(); updateCartUI(); }
+
+  function goToCheckout() { if (cart.length) window.location.href = 'checkout.html'; }
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      renderProducts();
+    });
+  });
+
+  function renderProducts() {
+    const grid = document.getElementById('products-grid');
+    const noP = document.getElementById('no-products');
+    const filtered = currentFilter === 'all'
+      ? allProducts
+      : allProducts.filter(p => normalizeCategory(p.category) === normalizeCategory(currentFilter));
+    if (!filtered.length) { grid.innerHTML=''; noP.classList.remove('hidden'); return; }
+    noP.classList.add('hidden');
+    grid.innerHTML = filtered.map(p => {
+      const inStock = (p.stock||0) > 0;
+      return `
+        <div class="product-card ${!inStock?'out-of-stock':''}">
+          <div class="relative">
+            <img src="${p.imageUrl||'https://placehold.co/400x280/E5F3E7/1E4D2B?text='+encodeURIComponent(p.name)}"
+                 alt="${p.name}" class="w-full h-36 sm:h-44 object-cover"
+                 onerror="this.src='https://placehold.co/400x280/E5F3E7/1E4D2B?text=Product'">
+            <span class="badge ${inStock?'badge-instock':'badge-out'}">${inStock?'In Stock':'Sold Out'}</span>
+            ${p.category?`<span class="absolute top-8 left-8 text-xs bg-accent/80 text-white px-2 py-0.5 rounded-full capitalize">${p.category}</span>`:''}
+          </div>
+          <div class="p-3 sm:p-4">
+            <h3 class="font-semibold text-text-dark text-sm leading-tight mb-1 line-clamp-2">${p.name}</h3>
+            ${p.description?`<p class="text-xs text-text-mid mb-2 product-description" onmouseenter="this.classList.add('expanded')" onmouseleave="this.classList.remove('expanded')">${p.description}</p>`:''}
+            <div class="flex justify-between items-center mt-2">
+              <p class="text-base sm:text-lg font-extrabold text-accent">R${p.price}</p>
+              ${p.stock?`<span class="stock-count">${p.stock} left</span>`:''}
+            </div>
+            <button id="add-btn-${p.id}"
+              onclick="addToCart({id:'${p.id}',name:'${p.name.replace(/'/g,"\\'")}',price:${p.price},imageUrl:'${(p.imageUrl||'').replace(/'/g,"\\'")}'})"
+              class="btn-accent w-full py-2 text-sm mt-3" ${!inStock?'disabled':''}>
+              ${inStock?'Add to Cart':'Out of Stock'}
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  async function loadProducts() {
+    try {
+      const snap = await db.collection('products').orderBy('createdAt','desc').get();
+      allProducts = snap.docs.map(d => ({id:d.id,...d.data()}));
+      renderProducts();
+    } catch(e) {
+      console.error(e);
+      document.getElementById('products-grid').innerHTML = `<div class="col-span-full text-center py-8 text-red-500">Failed to load products. Check Firebase config.</div>`;
+    }
+  }
+
+  loadProducts();
+  updateCartUI();
+</script>
+</body>
+</html>

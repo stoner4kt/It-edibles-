@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkout | OG EDIBLES1738</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: "#1E4D2B", "primary-dark": "#122E19",
+            secondary: "#E5F3E7", accent: "#A56CFF",
+            "text-dark": "#333333", "text-mid": "#6B7280"
+          },
+          fontFamily: { sans: ["'Inter'", "sans-serif"] }
+        }
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { background: #fff; font-family: 'Inter', sans-serif; color: #333; }
+    .navbar { background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(30,77,43,0.1); }
+    .btn-accent { background: #A56CFF; color: #fff; font-weight: 700; border-radius: 999px; transition: all 0.3s; border: 1px solid rgba(165,108,255,0.8); }
+    .btn-accent:hover { background: #8B4FE0; transform: translateY(-1px); }
+    .btn-accent:disabled { background: #ccc; border-color: #ccc; cursor: not-allowed; transform: none; }
+    .btn-outline { border: 1.5px solid rgba(30,77,43,0.2); color: #1E4D2B; border-radius: 999px; font-weight: 600; transition: all 0.3s; }
+    .btn-outline:hover { border-color: #A56CFF; color: #A56CFF; }
+    .field { width: 100%; border: 1px solid rgba(30,77,43,0.2); border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; background: #fff; color: #333; outline: none; transition: border 0.2s; font-family: 'Inter', sans-serif; }
+    .field:focus { border-color: #A56CFF; box-shadow: 0 0 0 3px rgba(165,108,255,0.1); }
+    .card { background: #fff; border-radius: 20px; padding: 1.5rem; border: 1px solid rgba(30,77,43,0.1); box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+    .step-badge { width: 32px; height: 32px; border-radius: 50%; background: rgba(165,108,255,0.1); color: #A56CFF; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(165,108,255,0.3); font-size: 0.9rem; }
+    #success-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; display: none; align-items: center; justify-content: center; }
+    #success-overlay.show { display: flex; }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<header class="navbar sticky top-0 z-30">
+  <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between items-center h-16">
+      <a href="index.html" class="flex items-center gap-3">
+        <img src="images/logo.jpg" alt="OG EDIBLES1738" class="h-9 rounded-full border-2 border-primary/20">
+        <span class="font-bold text-primary hidden sm:inline">OG EDIBLES<span class="text-accent">1738</span></span>
+      </a>
+      <a href="products.html" class="border border-accent/40 text-accent rounded-full px-4 py-2 text-sm font-medium hover:bg-accent hover:text-white transition">
+        ← Back to Products
+      </a>
+    </div>
+  </div>
+</header>
+
+<!-- SUCCESS OVERLAY -->
+<div id="success-overlay">
+  <div class="bg-white rounded-3xl p-10 text-center max-w-md mx-4 border-t-4 border-accent shadow-2xl">
+    <img src="images/logo.jpg" alt="OG EDIBLES1738" class="w-20 h-20 object-cover rounded-full mx-auto mb-5 border-4 border-secondary">
+    <div class="text-5xl mb-4">🎉</div>
+    <h2 class="text-3xl font-extrabold text-primary mb-3">Order Placed!</h2>
+    <p id="success-message" class="text-text-mid mb-6 text-sm leading-relaxed">Your receipt has been downloaded. Please send it to us on WhatsApp or Instagram with your order number.</p>
+    <a href="products.html" class="btn-accent inline-block px-8 py-3">Continue Shopping</a>
+  </div>
+</div>
+
+<main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-5xl">
+
+  <!-- Page header -->
+  <div class="mb-8 bg-secondary rounded-2xl p-6 flex items-start justify-between gap-4 border border-primary/10">
+    <div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-primary mb-2">Checkout</h1>
+      <p class="text-text-mid">Complete your order and download your receipt. We'll finalise payment and delivery over WhatsApp.</p>
+    </div>
+    <img src="images/logo.jpg" alt="OG EDIBLES1738" class="w-14 h-14 rounded-full border-2 border-primary/20 flex-shrink-0 object-cover">
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+
+    <!-- LEFT: 3 cols -->
+    <div class="lg:col-span-3 space-y-6">
+
+      <!-- Order summary -->
+      <div class="card">
+        <h2 class="text-xl font-extrabold text-primary mb-4 flex items-center gap-3">
+          <span class="step-badge">1</span> Your Order
+        </h2>
+        <div id="order-items" class="space-y-3 mb-4">
+          <p class="text-text-mid text-sm">Loading cart…</p>
+        </div>
+        <div class="border-t border-primary/10 pt-3 flex justify-between items-center">
+          <span class="font-semibold">Total</span>
+          <span id="order-total" class="text-2xl font-extrabold text-accent">R0</span>
+        </div>
+        <p class="text-xs text-text-mid mt-2">Cart empty? <a href="products.html" class="text-accent underline">Go back to products</a></p>
+      </div>
+
+      <!-- Customer details -->
+      <div class="card">
+        <h2 class="text-xl font-extrabold text-primary mb-4 flex items-center gap-3">
+          <span class="step-badge">2</span> Your Details
+        </h2>
+        <div class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1 text-text-dark">Full Name *</label>
+              <input type="text" id="cust-name" class="field" placeholder="Your name" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1 text-text-dark">WhatsApp Number *</label>
+              <input type="tel" id="cust-whatsapp" class="field" placeholder="e.g. 0721234567" required>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1 text-text-dark">Email Address *</label>
+            <input type="email" id="cust-email" class="field" placeholder="your@email.com" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1 text-text-dark">Delivery Address *</label>
+            <input type="text" id="cust-address" class="field" placeholder="Street, suburb, city" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1 text-text-dark">Special Instructions (optional)</label>
+            <textarea id="cust-notes" class="field" rows="2" placeholder="Any delivery notes or instructions…"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: 2 cols -->
+    <div class="lg:col-span-2 space-y-6">
+      <div class="card">
+        <h2 class="text-xl font-extrabold text-primary mb-4 flex items-center gap-3">
+          <span class="step-badge">3</span> Receipt Required
+        </h2>
+        <p class="text-sm text-text-mid mb-3">A PDF receipt will be generated in your browser after placing your order. You must download and share it with us to confirm payment and arrange delivery.</p>
+        <div class="rounded-xl p-4 text-sm space-y-2 bg-secondary border border-primary/10">
+          <p class="font-semibold text-primary">Contact us after ordering:</p>
+          <p><strong>WhatsApp:</strong> <a class="text-accent underline" href="https://wa.me/27000000000" target="_blank">0700000000</a></p>
+          <p><strong>Instagram:</strong> <a class="text-accent underline" href="https://www.instagram.com/ogedibles1738" target="_blank">@ogedibles1738</a></p>
+          <p class="text-xs text-text-mid">Send your receipt or order number for payment methods and delivery details.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="font-bold text-primary mb-3">Stay connected</h3>
+        <div class="flex flex-wrap gap-2">
+          <a href="https://www.instagram.com/ogedibles1738" target="_blank" class="btn-accent px-4 py-2 text-xs">Instagram</a>
+          <a href="https://wa.me/27000000000" target="_blank" class="btn-outline px-4 py-2 text-xs border-green-400 text-green-600">WhatsApp</a>
+        </div>
+      </div>
+
+      <button id="submit-order-btn" onclick="submitOrder()" class="btn-accent w-full py-4 text-base" disabled>
+        Place Order &amp; Download Receipt
+      </button>
+      <p id="submit-error" class="text-center text-red-500 text-sm hidden"></p>
+      <p class="text-xs text-text-mid text-center">By placing your order you confirm you are 21+ and comply with local laws.</p>
+    </div>
+  </div>
+</main>
+
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script>
+  let cart = JSON.parse(localStorage.getItem('og1738_cart') || '[]');
+
+  function renderOrder() {
+    const c = document.getElementById('order-items');
+    if (!cart.length) {
+      c.innerHTML = '<p class="text-text-mid text-sm">Your cart is empty. <a href="products.html" class="text-accent underline">Go back to products</a></p>';
+      return;
+    }
+    const total = cart.reduce((s,i) => s+i.price*i.qty, 0);
+    c.innerHTML = cart.map(item => `
+      <div class="flex gap-3 items-center">
+        <img src="${item.imageUrl||'https://placehold.co/50x50/E5F3E7/1E4D2B?text=P'}" class="w-12 h-12 object-cover rounded-lg flex-shrink-0" onerror="this.src='https://placehold.co/50x50/E5F3E7/1E4D2B?text=P'">
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium truncate text-text-dark">${item.name}</p>
+          <p class="text-xs text-text-mid">Qty: ${item.qty} × R${item.price}</p>
+        </div>
+        <p class="font-bold text-accent text-sm">R${item.price*item.qty}</p>
+      </div>`).join('');
+    document.getElementById('order-total').textContent = 'R'+total;
+  }
+
+  function checkReady() {
+    const n = document.getElementById('cust-name').value.trim();
+    const w = document.getElementById('cust-whatsapp').value.trim();
+    const e = document.getElementById('cust-email').value.trim();
+    const a = document.getElementById('cust-address').value.trim();
+    document.getElementById('submit-order-btn').disabled = !(n && w && e && a && cart.length);
+  }
+
+  ['cust-name','cust-whatsapp','cust-email','cust-address'].forEach(id => {
+    document.getElementById(id).addEventListener('input', checkReady);
+  });
+
+  function loadLogoDataUrl() {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas error')); return; }
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg'));
+      };
+      img.onerror = () => reject(new Error('Logo failed to load.'));
+      img.src = 'images/logo.jpg';
+    });
+  }
+
+  async function generateReceiptPdf({ orderId, totalAmount }) {
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) throw new Error('PDF generator not loaded.');
+    const doc = new jsPDF();
+    const name = document.getElementById('cust-name').value.trim();
+    const wa = document.getElementById('cust-whatsapp').value.trim();
+    const date = new Date().toLocaleString('en-ZA');
+
+    let logoDataUrl;
+    try { logoDataUrl = await loadLogoDataUrl(); } catch(e) { logoDataUrl = null; }
+
+    // Background
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, 210, 297, 'F');
+
+    // Header strip
+    doc.setFillColor(30, 77, 43);
+    doc.rect(0, 0, 210, 38, 'F');
+
+    // Logo circle (if loaded)
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, 'JPEG', 14, 6, 26, 26);
+    }
+
+    // Brand name
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('OG EDIBLES1738', 50, 20);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Premium Cannabis Edibles', 50, 28);
+
+    // RECEIPT label
+    doc.setTextColor(165, 108, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('RECEIPT', 155, 24, { align: 'right' });
+
+    // Order info
+    doc.setTextColor(51, 51, 51);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    let y = 52;
+    doc.text(`Order #: ${orderId}`, 14, y); y += 7;
+    doc.text(`Date: ${date}`, 14, y); y += 7;
+    doc.text(`Customer: ${name}`, 14, y); y += 7;
+    doc.text(`WhatsApp: ${wa}`, 14, y); y += 10;
+
+    // Divider
+    doc.setDrawColor(165, 108, 255);
+    doc.setLineWidth(0.5);
+    doc.line(14, y, 196, y); y += 8;
+
+    // Table header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(30, 77, 43);
+    doc.text('Item', 14, y);
+    doc.text('Amount', 196, y, { align: 'right' });
+    y += 6;
+    doc.setDrawColor(229, 243, 231);
+    doc.line(14, y, 196, y); y += 6;
+
+    // Items
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 51, 51);
+    cart.forEach(item => {
+      const label = `${item.name} x${item.qty} @ R${item.price}`;
+      doc.text(label.substring(0, 88), 14, y);
+      doc.text(`R${item.price * item.qty}`, 196, y, { align: 'right' });
+      y += 7;
+    });
+
+    y += 4;
+    doc.setDrawColor(165, 108, 255);
+    doc.line(14, y, 196, y); y += 10;
+
+    // Total
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(165, 108, 255);
+    doc.text(`TOTAL: R${totalAmount}`, 196, y, { align: 'right' });
+
+    y += 16;
+    doc.setFillColor(229, 243, 231);
+    doc.roundedRect(14, y, 182, 28, 4, 4, 'F');
+    y += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(30, 77, 43);
+    const footer = doc.splitTextToSize('Send this receipt or order number to WhatsApp 0700000000 or Instagram @ogedibles1738 for payment methods and delivery details.', 170);
+    doc.text(footer, 18, y);
+
+    y += 26;
+    doc.setTextColor(165, 108, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('www.ogedibles1738.netlify.app', 105, y, { align: 'center' });
+
+    doc.save(`${orderId}-receipt.pdf`);
+  }
+
+  async function submitOrder() {
+    const btn = document.getElementById('submit-order-btn');
+    const errEl = document.getElementById('submit-error');
+    errEl.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = 'Submitting order…';
+
+    try {
+      const orderId = 'OG-'+Date.now();
+      const customerName = document.getElementById('cust-name').value.trim();
+      const totalAmount = cart.reduce((s,i) => s+i.price*i.qty, 0);
+
+      btn.textContent = 'Saving order…';
+
+      const res = await fetch('/.netlify/functions/save-data?action=checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId, customerName, totalAmount,
+          items: cart,
+          whatsapp: document.getElementById('cust-whatsapp').value.trim(),
+          email:    document.getElementById('cust-email').value.trim(),
+          address:  document.getElementById('cust-address').value.trim(),
+          notes:    document.getElementById('cust-notes').value.trim()
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Submission failed.');
+
+      btn.textContent = 'Generating receipt…';
+      await generateReceiptPdf({ orderId, totalAmount });
+
+      localStorage.removeItem('og1738_cart');
+      document.getElementById('success-message').innerHTML =
+        `Your receipt has been downloaded. Send it to WhatsApp <strong>0700000000</strong> or Instagram <strong>@ogedibles1738</strong> with your order number <strong>${orderId}</strong> for payment and delivery details.`;
+      document.getElementById('success-overlay').classList.add('show');
+
+    } catch(e) {
+      console.error(e);
+      errEl.textContent = 'Failed to place order: ' + e.message;
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Place Order & Download Receipt';
+    }
+  }
+
+  renderOrder();
+</script>
+</body>
+</html>
