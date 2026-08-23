@@ -3,12 +3,13 @@
 // Get them from: https://console.firebase.google.com → Project Settings → Your Apps
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyAyK4Qz97IGtNsZFAZT3ReLT19GHpvgyGQ",
+  authDomain: "og-edibles---reviews.firebaseapp.com",
+  projectId: "og-edibles---reviews",
+  storageBucket: "og-edibles---reviews.firebasestorage.app",
+  messagingSenderId: "932728051152",
+  appId: "1:932728051152:web:3ff2345af63c91e691d5d5",
+  measurementId: "G-BL0XW6REQX"
 };
 
 // Initialize Firebase (guard against duplicate initialization)
