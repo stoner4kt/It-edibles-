@@ -156,7 +156,7 @@
       <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 16 16"><path d="M9 0h1.98c.144.715.54 1.617 1.235 2.512C12.895 3.389 13.797 4 15 4v2c-1.753 0-3.07-.814-4-1.829V11a5 5 0 1 1-5-5v2a3 3 0 1 0 3 3z"/></svg>
       TikTok
     </a>
-    <a href="https://wa.me/27000000000" target="_blank" class="social-link text-green-600">
+    <a href="https://wa.me/27637572748" target="_blank" class="social-link text-green-600">
       <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M20.52 3.48A11.91 11.91 0 0012.07 0C5.44 0 .04 5.4.04 12.03c0 2.12.55 4.18 1.6 6.01L0 24l6.15-1.61a12.03 12.03 0 005.92 1.51h.01c6.63 0 12.03-5.4 12.03-12.03 0-3.21-1.25-6.23-3.59-8.39z"/></svg>
       WhatsApp Us
     </a>
@@ -257,7 +257,7 @@
         <div class="flex flex-wrap gap-2">
           <a href="https://www.instagram.com/ogedibles1738" target="_blank" class="btn-accent px-4 py-2 text-xs">Instagram</a>
           <a href="https://www.tiktok.com/@og.edibles" target="_blank" class="btn-primary px-4 py-2 text-xs">TikTok</a>
-          <a href="https://wa.me/27000000000" target="_blank" class="btn-outline border-green-500 text-green-600 px-4 py-2 text-xs">WhatsApp</a>
+          <a href="https://wa.me/27637572748" target="_blank" class="btn-outline border-green-500 text-green-600 px-4 py-2 text-xs">WhatsApp</a>
         </div>
       </div>
     </div>
@@ -364,7 +364,7 @@
         <div>
           <h4 class="font-semibold mb-4">Connect</h4>
           <ul class="space-y-2 text-sm">
-            <li><a href="https://wa.me/27000000000" target="_blank" class="text-white/60 hover:text-accent transition">WhatsApp</a></li>
+            <li><a href="https://wa.me/27637572748" target="_blank" class="text-white/60 hover:text-accent transition">WhatsApp</a></li>
             <li><a href="https://www.instagram.com/ogedibles1738" target="_blank" class="text-white/60 hover:text-accent transition">Instagram</a></li>
             <li><a href="https://www.tiktok.com/@og.edibles" target="_blank" class="text-white/60 hover:text-accent transition">TikTok</a></li>
             <li><a href="https://www.facebook.com/share/1AF5i41jy6" target="_blank" class="text-white/60 hover:text-accent transition">Facebook</a></li>
@@ -388,17 +388,14 @@
 </div><!-- /main-content -->
 
 <!-- WhatsApp FAB -->
-<a href="https://wa.me/27000000000" target="_blank"
+<a href="https://wa.me/27637572748" target="_blank"
    class="fixed bottom-6 right-4 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-xl bg-green-500 hover:bg-green-600 transition text-white">
   <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M20.52 3.48A11.91 11.91 0 0012.07 0C5.44 0 .04 5.4.04 12.03c0 2.12.55 4.18 1.6 6.01L0 24l6.15-1.61a12.03 12.03 0 005.92 1.51h.01c6.63 0 12.03-5.4 12.03-12.03 0-3.21-1.25-6.23-3.59-8.39z"/></svg>
 </a>
 
-<!-- FIREBASE -->
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
-<script src="firebase-config.js"></script>
+<!-- SUPABASE -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 
 <script>
   document.getElementById('year').textContent = new Date().getFullYear();
@@ -438,18 +435,27 @@
   }, { threshold: 0.1 });
   revealEls.forEach(el => revealObserver.observe(el));
 
-  // Load featured products from Firebase
+  // Load featured products from Supabase
   async function loadFeaturedProducts() {
     const grid = document.getElementById('featured-grid');
+    if (!supabaseConfigured) {
+      grid.innerHTML = '<div class="col-span-2 md:col-span-3 text-center py-8 text-text-mid"><p>Featured products will appear once Supabase is configured.</p></div>';
+      return;
+    }
     try {
-      const snap = await db.collection('products').orderBy('createdAt', 'desc').limit(6).get();
-      if (snap.empty) {
+      const { data: products, error } = await supabaseClient
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(6);
+      if (error) throw error;
+      if (!products || products.length === 0) {
         grid.innerHTML = '<div class="col-span-2 md:col-span-3 text-center py-8 text-text-mid"><p>No products available yet. Check back soon!</p></div>';
         return;
       }
       grid.innerHTML = '';
-      snap.forEach(doc => {
-        const p = { id: doc.id, ...doc.data() };
+      products.forEach(p => {
+        p.imageUrl = p.image_url; // alias for template below
         const inStock = (p.stock || 0) > 0;
         grid.innerHTML += `
           <div class="product-card bg-secondary rounded-xl p-4 shadow-lg hover:shadow-2xl border border-primary/8 relative overflow-hidden">
@@ -466,7 +472,9 @@
       });
     } catch (e) {
       console.error(e);
-      grid.innerHTML = '<div class="col-span-2 md:col-span-3 text-center py-8 text-red-500"><p>Could not load products.</p></div>';
+      grid.innerHTML = supabaseConfigured
+        ? '<div class="col-span-2 md:col-span-3 text-center py-8 text-red-500"><p>Could not load products.</p></div>'
+        : '<div class="col-span-2 md:col-span-3 text-center py-8 text-text-mid"><p>Supabase isn\'t configured yet. Add your project credentials to <code>supabase-config.js</code>.</p></div>';
     }
   }
 
@@ -475,7 +483,7 @@
 
   function reviewCardHtml(r) {
     const stars = '★'.repeat(r.rating || 5) + '☆'.repeat(5 - (r.rating || 5));
-    const date = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('en-ZA') : '';
+    const date = r.created_at ? new Date(r.created_at).toLocaleDateString('en-ZA') : '';
     return `<div class="review-card">
       <div class="flex justify-between items-start mb-2">
         <p class="font-bold text-primary">${escHtml(r.name || 'Customer')}</p>
@@ -513,20 +521,32 @@
 
   async function loadReviews() {
     const host = document.getElementById('reviews-layout');
+    if (!supabaseConfigured) {
+      host.innerHTML = `<div class="max-w-xl mx-auto">${reviewFormHtml()}</div>`;
+      bindReviewForm();
+      return;
+    }
     try {
-      const snap = await db.collection('reviews').orderBy('createdAt', 'desc').limit(9).get();
-      if (snap.empty) {
+      const { data: reviews, error } = await supabaseClient
+        .from('reviews')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(9);
+      if (error) throw error;
+      if (!reviews || reviews.length === 0) {
         host.innerHTML = `<div class="max-w-xl mx-auto">${reviewFormHtml()}</div>`;
       } else {
         let cards = '';
-        snap.forEach(d => { cards += reviewCardHtml(d.data()); });
+        reviews.forEach(r => { cards += reviewCardHtml(r); });
         host.innerHTML = `
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">${cards}</div>
           <div class="max-w-xl mx-auto">${reviewFormHtml()}</div>`;
       }
       bindReviewForm();
     } catch (e) {
-      host.innerHTML = '<p class="text-center text-red-500">Failed to load reviews.</p>';
+      host.innerHTML = supabaseConfigured
+        ? '<p class="text-center text-red-500">Failed to load reviews.</p>'
+        : '<p class="text-center text-text-mid">Reviews will appear once Supabase is configured.</p>';
     }
   }
 
@@ -545,7 +565,10 @@
       document.getElementById('submit-review-btn').textContent = 'Submitting…';
       document.getElementById('submit-review-btn').disabled = true;
       try {
-        await db.collection('reviews').add({ name, rating, comment, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        const { error } = await supabaseClient
+          .from('reviews')
+          .insert({ name, rating, comment });
+        if (error) throw error;
         msg.textContent = 'Thank you! Your review has been submitted.';
         msg.className = 'text-center text-sm mt-3 text-green-600';
         msg.classList.remove('hidden');

@@ -214,17 +214,14 @@
 </button>
 
 <!-- WhatsApp FAB -->
-<a href="https://wa.me/27000000000" target="_blank"
+<a href="https://wa.me/27637572748" target="_blank"
    class="fixed bottom-6 right-4 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-xl bg-green-500 hover:bg-green-600 transition text-white">
   <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M20.52 3.48A11.91 11.91 0 0012.07 0C5.44 0 .04 5.4.04 12.03c0 2.12.55 4.18 1.6 6.01L0 24l6.15-1.61a12.03 12.03 0 005.92 1.51h.01c6.63 0 12.03-5.4 12.03-12.03 0-3.21-1.25-6.23-3.59-8.39z"/></svg>
 </a>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
-<script src="firebase-config.js"></script>
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 
 <script>
   let allProducts = [];
@@ -356,13 +353,24 @@
   }
 
   async function loadProducts() {
+    if (!supabaseConfigured) {
+      document.getElementById('products-grid').innerHTML =
+        `<div class="col-span-full text-center py-8 text-text-mid">Supabase isn't configured yet. Add your project URL and anon key to <code>supabase-config.js</code>.</div>`;
+      return;
+    }
     try {
-      const snap = await db.collection('products').orderBy('createdAt','desc').get();
-      allProducts = snap.docs.map(d => ({id:d.id,...d.data()}));
+      const { data, error } = await supabaseClient
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      allProducts = (data || []).map(p => ({ id:p.id, ...p, imageUrl:p.image_url }));
       renderProducts();
     } catch(e) {
       console.error(e);
-      document.getElementById('products-grid').innerHTML = `<div class="col-span-full text-center py-8 text-red-500">Failed to load products. Check Firebase config.</div>`;
+      document.getElementById('products-grid').innerHTML = supabaseConfigured
+        ? `<div class="col-span-full text-center py-8 text-red-500">Failed to load products. Please try again.</div>`
+        : `<div class="col-span-full text-center py-8 text-text-mid">Supabase isn't configured yet. Add your project URL and anon key to <code>supabase-config.js</code>.</div>`;
     }
   }
 

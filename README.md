@@ -1,6 +1,12 @@
-# 🌿 OG EDIBLES1738 – Website v2
+# 🌿 OG EDIBLES1738 – Website v3
 
-A complete cannabis e-commerce website with Firebase backend, admin panel, and proof-of-payment order flow. Built with the OG EDIBLES1738 branding (white/green/purple) and full functionality from the Herbal Heights architecture.
+A complete cannabis e-commerce website with a **Supabase** backend, **Resend** transactional
+email, admin panel, and proof-of-payment order flow. Built with the OG EDIBLES1738 branding
+(white/green/purple).
+
+**Orders are still confirmed over WhatsApp.** The checkout flow is unchanged: the customer
+places the order, a PDF receipt downloads, and they send it to WhatsApp/Instagram with their
+order number. Supabase stores the order; Resend notifies the shop and the customer.
 
 ---
 
@@ -8,14 +14,16 @@ A complete cannabis e-commerce website with Firebase backend, admin panel, and p
 
 ```
 og-edibles-1738/
-├── index.html              → Homepage (hero, featured products from Firebase, reviews, about)
+├── index.html              → Homepage (hero, featured products, reviews, about)
 ├── products.html           → Full product catalogue with cart drawer
 ├── checkout.html           → Order form + PDF receipt download
-├── admin.html              → Admin dashboard (password-protected)
-├── firebase-config.js      → Firebase configuration (EDIT THIS FIRST)
+├── admin.html              → Admin dashboard (Supabase auth + is_admin profile flag)
+├── supabase-config.js      → Supabase URL + anon key (EDIT THIS FIRST)
+├── supabase/schema.sql     → Tables, RLS policies, triggers, storage bucket
+├── server.js               → Local preview server (static files + functions)
 ├── netlify.toml            → Netlify build config
 ├── netlify/functions/
-│   ├── save-data.js        → Backend: product upload + order save
+│   ├── save-data.js        → Checkout: order insert + Resend emails
 │   └── package.json
 └── images/                 → All product and brand images
 ```
@@ -24,62 +32,65 @@ og-edibles-1738/
 
 ## 🚀 Quick Setup
 
-### Step 1: Firebase Project
-1. Go to https://console.firebase.google.com
-2. Create project → register Web app → copy `firebaseConfig`
+### Step 1: Create the Supabase project
+1. Go to https://supabase.com/dashboard → New project
+2. Copy the **Project URL** and **anon public key** from Project Settings → API
 
-### Step 2: Update `firebase-config.js`
-Replace placeholder values with your Firebase credentials.
+### Step 2: Create the schema
+Open the Supabase **SQL Editor**, paste the whole of `supabase/schema.sql`, and run it.
 
-### Step 3: Enable Firebase Services
-- **Firestore Database** → Create database (test mode)
-- **Storage** → Get started (test mode)
-- **Authentication** → Enable Email/Password
+This creates:
+- `products`, `orders`, `reviews`, `profiles` tables
+- Row Level Security policies (public read for products/reviews, admin-only for orders)
+- The `public.is_admin()` helper and `profiles` auto-creation trigger
+- The `product-images` storage bucket
 
-### Step 4: Create Admin Account
-1. Firebase Console → Authentication → Add user (email + password)
-2. Copy the UID shown
-3. Firestore → Add collection `admins` → Document ID = your UID → `{ isAdmin: true }`
+The script is idempotent — safe to run again.
 
-### Step 5: Firestore Rules
+### Step 3: Set the anon key in `supabase-config.js`
+```js
+supabaseUrl:     "https://YOUR-PROJECT-REF.supabase.co",
+supabaseAnonKey: "YOUR-ANON-PUBLIC-KEY"
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /products/{doc} { allow read: if true; allow write: if request.auth != null; }
-    match /orders/{doc}   { allow read: if request.auth != null; allow create: if true; }
-    match /reviews/{doc}  { allow read: if true; allow create: if true; allow write: if request.auth != null; }
-    match /admins/{doc}   { allow read, write: if request.auth != null; }
-  }
-}
-```
+While these are placeholders the site renders a "Supabase isn't configured yet" hint
+instead of failing silently.
 
-### Step 6: Storage Rules
+### Step 4: Create the admin user
+1. Supabase → Authentication → Users → **Add user** (email + password)
+2. Copy the new user's UUID, then run in the SQL Editor:
+```sql
+INSERT INTO public.profiles (id, email, is_admin)
+VALUES ('<user-uuid>', '<admin-email>', true)
+ON CONFLICT (id) DO UPDATE SET is_admin = true;
 ```
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /{allPaths=**} { allow read, write: if true; }
-  }
-}
-```
+The admin panel signs in with email + password (magic link is available as a fallback) and
+then verifies `profiles.is_admin` server-side before showing anything.
 
-### Step 7: Netlify Environment Variables
-In Netlify dashboard → Site Settings → Environment Variables, add:
+### Step 5: Netlify environment variables
 
 | Variable | Description |
 |----------|-------------|
-| `SERVICE_ACCOUNT_JSON` | Full Firebase service account JSON (from Project Settings → Service Accounts) |
-| `CLOUDINARY_CLOUD_NAME` | Your Cloudinary cloud name |
-| `CLOUDINARY_API_KEY` | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
-| `GOOGLE_SHEET_ID` | (Optional) Google Sheet ID for order logging |
+| `SUPABASE_URL` | Project Settings → API → Project URL |
+| `SUPABASE_SERVICE_KEY` | Project Settings → API → `service_role` (**secret**, never in the browser) |
+| `RESEND_API_KEY` | https://resend.com → API Keys |
+| `RESEND_FROM_EMAIL` | Verified sender, e.g. `OG EDIBLES1738 <orders@yourdomain.com>` |
+| `ORDER_NOTIFY_EMAILS` | Comma-separated addresses that receive new-order emails |
 
-### Step 8: Update Contact Details
-Find and replace in all HTML files:
-- `27000000000` → your WhatsApp number (with country code, no +)
-- `0700000000` → your local WhatsApp number
-- `@ogedibles1738` → your Instagram handle
+Emails are best-effort: if Resend fails, the order is still saved and the response returns a
+`warnings` array so the failure is visible instead of silent.
+
+---
+
+## 🧪 Running locally
+
+```bash
+# static site + Netlify functions in one process
+node server.js 3000
+# → http://localhost:3000
+```
+
+For full checkout behaviour, export `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`,
+`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `ORDER_NOTIFY_EMAILS` before starting.
 
 ---
 
@@ -88,33 +99,46 @@ Find and replace in all HTML files:
 ### Homepage (`index.html`)
 - Age verification gate (21+)
 - Hero section with CTA
-- Featured products loaded from Firebase (latest 6)
-- Customer reviews — view + submit from Firebase
+- Featured products loaded from Supabase (latest 6)
+- Customer reviews — view + submit
 - About / Our Story section
 - Footer with social links
 
 ### Products (`products.html`)
-- Full product catalogue from Firebase
+- Full product catalogue from Supabase
 - Filter by category (Edibles, Flower, Pre-rolls, Drinks, etc.)
 - Add to cart with quantity controls
 - Cart drawer with totals
-- Proceed to checkout button
 
 ### Checkout (`checkout.html`)
 - Order summary with cart items
 - Customer details form (name, WhatsApp, email, address)
-- Order saved to Firestore via Netlify function
-- **PDF receipt auto-downloaded** after order placed
-- Success overlay with contact instructions
+- Order saved to Supabase via the `save-data` Netlify function
+- **PDF receipt auto-downloaded** after ordering
+- Success overlay with WhatsApp / Instagram handoff instructions
 
 ### Admin Panel (`admin.html`)
 Access at: `yoursite.com/admin.html`
 
-- Login with Firebase email/password (must be in `admins` collection)
-- **Overview:** Stats (products, orders, revenue) + recent orders
-- **Products:** View all, update stock inline, edit/delete
-- **Orders:** View all, filter by status, update status
-- **Add Product:** Upload new products with image (via Cloudinary) + all details
+- Sign in with Supabase email/password (must have `is_admin = true`)
+- **Overview:** stats (products, orders, revenue) + recent orders
+- **Products:** view all, update stock inline, edit/delete
+- **Orders:** view all, filter by status, update status
+- **Add Product:** upload a new product with image to the `product-images` bucket
+
+---
+
+## 🗄️ Database schema
+
+| Table | Purpose | Access |
+|-------|---------|--------|
+| `products` | Catalogue | public read, admin write |
+| `orders` | Placed orders (items stored as JSONB) | admin only |
+| `reviews` | Customer reviews | public read + insert, admin moderation |
+| `profiles` | One row per auth user, holds `is_admin` | own row read, admin all |
+
+`is_admin()` is `SECURITY DEFINER` so RLS policies can check the flag without recursing into
+the `profiles` policies.
 
 ---
 
@@ -132,25 +156,22 @@ Access at: `yoursite.com/admin.html`
 
 ## 🚢 Deploying
 
-### Netlify (Recommended)
+### Netlify
 1. Push to GitHub
-2. Connect repo to Netlify
-3. Set environment variables (see Step 7)
-4. Deploy — the `netlify.toml` handles the rest
-
-### Manual drag-and-drop
-1. Drag the folder to https://app.netlify.com/drop
-2. Note: Netlify functions won't work without environment variables set
+2. Connect the repo to Netlify
+3. Set the environment variables from Step 5
+4. Deploy — `netlify.toml` installs the function dependencies and publishes the site
 
 ---
 
 ## 🔧 Customisation
 
-### Adding Product Categories
+### WhatsApp number
+The number lives in the page markup as `wa.me/27637572748`. Update it in `index.html`,
+`products.html`, and `checkout.html` if it changes.
+
+### Adding product categories
 Edit the `<select>` in `admin.html` (Add Product tab) and the filter buttons in `products.html`.
 
-### WhatsApp Link
-Change `wa.me/27000000000` throughout all pages to your real number.
-
-### Receipt Footer
-In `checkout.html` → `generateReceiptPdf()` → update WhatsApp number and Instagram handle.
+### Receipt footer
+In `checkout.html` → `generateReceiptPdf()` → update the WhatsApp number and Instagram handle.
