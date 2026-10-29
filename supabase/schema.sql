@@ -109,10 +109,18 @@ create policy "orders admin delete"
 
 drop policy if exists "reviews public read"   on public.reviews;
 drop policy if exists "reviews public insert" on public.reviews;
+drop policy if exists "reviews admin update"  on public.reviews;
+drop policy if exists "reviews admin delete"  on public.reviews;
 create policy "reviews public read"
   on public.reviews for select using (true);
 create policy "reviews public insert"
   on public.reviews for insert with check (true);
+-- Anyone can post a review, so admins need to be able to remove spam.
+create policy "reviews admin update"
+  on public.reviews for update
+  using (public.is_admin()) with check (public.is_admin());
+create policy "reviews admin delete"
+  on public.reviews for delete using (public.is_admin());
 
 drop policy if exists "profiles self read"   on public.profiles;
 drop policy if exists "profiles admin write" on public.profiles;
