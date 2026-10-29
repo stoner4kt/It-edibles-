@@ -1,22 +1,16 @@
 // Supabase Configuration for OG EDIBLES1738
-// ⚠️ IMPORTANT: Replace these values with your own Supabase project credentials
-// Get them from: https://supabase.com/dashboard → Your Project → Settings → API
+// Values from: https://supabase.com/dashboard → Project Settings → API
 
 const supabaseConfig = {
-  // Project URL + anon key. The anon key is safe for browsers because RLS
-  // policies (supabase/schema.sql) enforce what anonymous users can do.
-  //
-  // Replace both values with your own project's credentials:
-  //   Supabase Dashboard → Project Settings → API
-  supabaseUrl: "https://YOUR-PROJECT-REF.supabase.co",
-  supabaseAnonKey: "YOUR-ANON-PUBLIC-KEY"
+  supabaseUrl: "https://jykljxykvctpzczhdtcu.supabase.co",
+  // The anon key is meant to be public. RLS policies in supabase/schema.sql
+  // are what actually protect the data.
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5a2xqeHlrdmN0cHpjemhkdGN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNzk4NjgsImV4cCI6MjEwODg1NTg2OH0.2I1pkxD3g8BufdQzHoBQvRNEwa25EaKxtqZUZiKzW7U"
 };
 
-// True until the two values above are replaced. Pages use this to show a
-// setup hint instead of a generic network error.
+// Pages use this to show a setup hint instead of a generic network error.
 const supabaseConfigured =
-  !supabaseConfig.supabaseUrl.includes("YOUR-PROJECT-REF") &&
-  !supabaseConfig.supabaseAnonKey.includes("YOUR-ANON-PUBLIC-KEY");
+  !!supabaseConfig.supabaseUrl && !!supabaseConfig.supabaseAnonKey;
 
 // Initialize Supabase client. The name must not be `supabase`: the CDN bundle
 // already defines that global, and a top-level `const supabase` would throw
