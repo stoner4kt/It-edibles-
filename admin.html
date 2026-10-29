@@ -134,6 +134,7 @@
     <div class="sidebar-link active" onclick="showTab('overview')"><span class="icon">📊</span> Overview</div>
     <div class="sidebar-link" onclick="showTab('products')"><span class="icon">🌿</span> Products</div>
     <div class="sidebar-link" onclick="showTab('orders')"><span class="icon">📦</span> Orders</div>
+    <div class="sidebar-link" onclick="showTab('reviews')"><span class="icon">⭐</span> Reviews</div>
     <div class="sidebar-link" onclick="showTab('add-product')"><span class="icon">➕</span> Add Product</div>
   </nav>
   <div class="absolute bottom-6 left-0 right-0 px-4">
@@ -213,6 +214,30 @@
           <tbody id="orders-table"></tbody></table>
         </div>
         <p id="orders-loading" class="text-center text-text-mid py-6">Loading…</p>
+      </div>
+    </div>
+
+    <!-- ─── REVIEWS ─── -->
+    <div id="tab-reviews" class="tab-content hidden">
+      <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <div>
+          <h3 class="text-lg font-extrabold text-primary">Customer Reviews</h3>
+          <p class="text-sm text-text-mid">Anyone can post a review, so remove anything that looks like spam.</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button class="tab-btn active" data-rating="all" onclick="filterReviews('all',this)">All</button>
+          <button class="tab-btn" data-rating="5" onclick="filterReviews('5',this)">5★</button>
+          <button class="tab-btn" data-rating="4" onclick="filterReviews('4',this)">4★</button>
+          <button class="tab-btn" data-rating="3" onclick="filterReviews('3',this)">3★</button>
+          <button class="tab-btn" data-rating="low" onclick="filterReviews('low',this)">≤2★</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table><thead><tr><th>Rating</th><th>Name</th><th>Review</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody id="reviews-table"></tbody></table>
+        </div>
+        <p id="reviews-loading" class="text-center text-text-mid py-6">Loading…</p>
       </div>
     </div>
 
@@ -413,12 +438,13 @@
       l.classList.remove('active');
       if (l.getAttribute('onclick').includes(tabName)) l.classList.add('active');
     });
-    const titles = { overview:'Overview', products:'Products', orders:'Orders', 'add-product':'Add Product' };
+    const titles = { overview:'Overview', products:'Products', orders:'Orders', reviews:'Reviews', 'add-product':'Add Product' };
     document.getElementById('page-title').textContent = titles[tabName] || tabName;
     closeSidebar();
     if (tabName === 'overview') loadOverview();
     else if (tabName === 'products') loadProductsTable();
     else if (tabName === 'orders') loadOrdersTable();
+    else if (tabName === 'reviews') loadReviewsTable();
   }
 
   function openSidebar() {
@@ -525,8 +551,90 @@
 
   async function deleteProduct(id, name) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-    try { await supabaseClient.from('products').delete().eq('id', id); loadProductsTable(); }
-    catch(e) { alert('Delete failed: '+e.message); }
+    try {
+      const { data, error } = await supabaseClient
+        .from('products').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Nothing was deleted. Your account may not have admin rights.');
+      loadProductsTable();
+    }
+    catch(e) { alert('Delete failed: '+(e.message || e)); }
+  }
+
+  // ─── REVIEWS ───
+  // Reviews are anonymous user input. Row actions are keyed by id only and the
+  // name/comment are escaped into the cell, never into an inline handler.
+  let reviewsCache = [];
+  let reviewFilter = 'all';
+
+  async function loadReviewsTable() {
+    const tbody = document.getElementById('reviews-table');
+    const loading = document.getElementById('reviews-loading');
+    loading.textContent = 'Loading…';
+    loading.classList.remove('hidden');
+    try {
+      const { data, error } = await supabaseClient
+        .from('reviews')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      reviewsCache = data || [];
+      loading.classList.add('hidden');
+      renderReviewsTable();
+    } catch (e) {
+      loading.textContent = 'Error loading reviews.';
+    }
+  }
+
+  function filterReviews(value, btn) {
+    reviewFilter = value;
+    document.querySelectorAll('#tab-reviews .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderReviewsTable();
+  }
+
+  function renderReviewsTable() {
+    const tbody = document.getElementById('reviews-table');
+    let rows = reviewsCache;
+    if (reviewFilter === 'low') rows = rows.filter(r => (r.rating || 0) <= 2);
+    else if (reviewFilter !== 'all') rows = rows.filter(r => String(r.rating) === reviewFilter);
+
+    if (rows.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-text-mid py-6">${
+        reviewsCache.length ? 'No reviews match this filter.' : 'No reviews yet.'
+      }</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const rating = Math.max(0, Math.min(5, parseInt(r.rating) || 0));
+      const date = r.created_at ? new Date(r.created_at).toLocaleDateString() : '–';
+      return `<tr>
+        <td class="whitespace-nowrap text-accent font-bold">${'★'.repeat(rating)}<span class="text-text-mid/40">${'★'.repeat(5 - rating)}</span></td>
+        <td class="font-medium max-w-[140px]"><p class="truncate">${escHtml(r.name || 'Anonymous')}</p></td>
+        <td class="text-sm text-text-mid max-w-[320px]"><p class="truncate" title="${escHtml(r.comment || '')}">${escHtml(r.comment || '–')}</p></td>
+        <td class="text-xs text-text-mid whitespace-nowrap">${date}</td>
+        <td><button onclick="deleteReview('${r.id}')" class="btn-danger text-xs">Delete</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function deleteReview(id) {
+    const r = reviewsCache.find(x => x.id === id);
+    const label = r ? `"${r.name || 'Anonymous'}: ${(r.comment || '').slice(0, 60)}${(r.comment||'').length > 60 ? '…' : ''}"` : 'this review';
+    if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+    try {
+      // RLS silently removes rows the caller may not delete, and supabase-js
+      // reports that as success with an empty payload. Ask for the deleted rows
+      // back so a blocked delete is caught instead of looking like it worked.
+      const { data, error } = await supabaseClient
+        .from('reviews').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Nothing was deleted. Your account may not have admin rights — check profiles.is_admin.');
+      }
+      reviewsCache = reviewsCache.filter(x => x.id !== id);
+      renderReviewsTable();
+    } catch (e) { alert('Delete failed: ' + (e.message || e)); }
   }
 
   function handleProductImage(input) {
