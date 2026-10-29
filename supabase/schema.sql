@@ -53,6 +53,22 @@ create table if not exists public.reviews (
   created_at timestamptz not null default now()
 );
 
+-- ─── Categories ──────────────────────────────────────────────
+-- products.category stores a category *slug*, so existing rows keep working
+-- and renaming a category never rewrites product data.
+create table if not exists public.categories (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  slug       text not null unique,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Case-insensitive uniqueness: "Edibles" and "edibles" are the same category.
+create unique index if not exists categories_name_lower_key
+  on public.categories (lower(name));
+
 -- ─── Profiles (admin flags) ──────────────────────────────────
 create table if not exists public.profiles (
   id         uuid primary key references auth.users(id) on delete cascade,
@@ -66,6 +82,7 @@ alter table public.products enable row level security;
 alter table public.orders   enable row level security;
 alter table public.reviews  enable row level security;
 alter table public.profiles enable row level security;
+alter table public.categories enable row level security;
 
 -- ─── Admin helper (defined before any policy that calls it) ──
 create or replace function public.is_admin()
@@ -88,6 +105,17 @@ create policy "products public read"
   on public.products for select using (true);
 create policy "products admin write"
   on public.products for all
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- The storefront needs the category list to build its filter bar, so reads are
+-- public. Only admins may change the list.
+drop policy if exists "categories public read" on public.categories;
+drop policy if exists "categories admin write" on public.categories;
+create policy "categories public read"
+  on public.categories for select using (true);
+create policy "categories admin write"
+  on public.categories for all
   using (public.is_admin())
   with check (public.is_admin());
 
@@ -173,6 +201,36 @@ create trigger orders_touch before update on public.orders
 drop trigger if exists profiles_touch on public.profiles;
 create trigger profiles_touch before update on public.profiles
   for each row execute function public.touch_updated_at();
+
+drop trigger if exists categories_touch on public.categories;
+create trigger categories_touch before update on public.categories
+  for each row execute function public.touch_updated_at();
+
+-- ─── Seed categories ─────────────────────────────────────────
+-- The ten the storefront used to hardcode, so an existing catalog keeps its
+-- filter bar and the product form stays populated.
+insert into public.categories (name, slug, sort_order) values
+  ('Flower',           'flower',            10),
+  ('Edibles',          'edibles',           20),
+  ('Pre-rolls',        'pre-rolls',         30),
+  ('Drinks',           'drinks',            40),
+  ('Accessories',      'accessories',       50),
+  ('Live Rosin',       'live rosin',        60),
+  ('Carts',            'carts',             70),
+  ('Special OG Mixed', 'special og mixed',  80),
+  ('Shisha Premium',   'shisha premium',    90),
+  ('Other',            'other',            100)
+on conflict (slug) do nothing;
+
+-- Pick up any category already used by a product but missing from the list,
+-- so nothing silently disappears from the filter bar after migrating.
+insert into public.categories (name, slug, sort_order)
+select initcap(trim(p.category)), trim(p.category), 1000
+from public.products p
+where trim(p.category) <> ''
+  and not exists (select 1 from public.categories c where c.slug = trim(p.category))
+group by trim(p.category)
+on conflict (slug) do nothing;
 
 -- ─── Storage: product images ─────────────────────────────────
 -- Run this from the SQL editor as well; it allows public read of

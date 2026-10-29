@@ -133,6 +133,7 @@
   <nav class="p-3 space-y-1 mt-3">
     <div class="sidebar-link active" onclick="showTab('overview')"><span class="icon">📊</span> Overview</div>
     <div class="sidebar-link" onclick="showTab('products')"><span class="icon">🌿</span> Products</div>
+    <div class="sidebar-link" onclick="showTab('categories')"><span class="icon">🏷️</span> Categories</div>
     <div class="sidebar-link" onclick="showTab('orders')"><span class="icon">📦</span> Orders</div>
     <div class="sidebar-link" onclick="showTab('reviews')"><span class="icon">⭐</span> Reviews</div>
     <div class="sidebar-link" onclick="showTab('add-product')"><span class="icon">➕</span> Add Product</div>
@@ -199,6 +200,34 @@
       </div>
     </div>
 
+    <!-- ─── CATEGORIES ─── -->
+    <div id="tab-categories" class="tab-content hidden">
+      <div class="mb-6">
+        <h3 class="text-lg font-extrabold text-primary">Product Categories</h3>
+        <p class="text-sm text-text-mid">These drive the storefront filter bar and the product form's category list. The slug is fixed once created, so renaming a category is safe and never touches existing products.</p>
+      </div>
+      <div class="card mb-6">
+        <h4 class="font-bold text-primary mb-3">Add a category</h4>
+        <div class="flex flex-wrap gap-3 items-end">
+          <div class="flex-1 min-w-[200px]">
+            <label class="field-label">Name *</label>
+            <input type="text" id="cat-name" class="field" placeholder="e.g. Concentrates"
+                   oninput="updateCategorySlugPreview()" onkeydown="if(event.key==='Enter')addCategory()">
+            <p class="text-xs text-text-mid mt-1">Slug: <code id="cat-slug-preview">—</code></p>
+          </div>
+          <button onclick="addCategory()" id="add-category-btn" class="btn-accent text-sm">+ Add Category</button>
+        </div>
+        <p id="category-msg" class="text-sm mt-3 hidden"></p>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table><thead><tr><th>Category</th><th>Slug</th><th>Products</th><th>Actions</th></tr></thead>
+          <tbody id="categories-table"></tbody></table>
+        </div>
+        <p id="categories-loading" class="text-center text-text-mid py-6">Loading…</p>
+      </div>
+    </div>
+
     <!-- ─── ORDERS ─── -->
     <div id="tab-orders" class="tab-content hidden">
       <div class="flex flex-wrap gap-3 mb-6">
@@ -254,6 +283,8 @@
             </div>
             <div>
               <label class="field-label">Category *</label>
+              <!-- Replaced at runtime from the categories table; these options
+                   are the fallback if that table has not been created yet. -->
               <select id="p-category" class="field">
                 <option value="">Select category…</option>
                 <option value="edibles">Edibles</option>
@@ -438,13 +469,15 @@
       l.classList.remove('active');
       if (l.getAttribute('onclick').includes(tabName)) l.classList.add('active');
     });
-    const titles = { overview:'Overview', products:'Products', orders:'Orders', reviews:'Reviews', 'add-product':'Add Product' };
+    const titles = { overview:'Overview', products:'Products', categories:'Categories', orders:'Orders', reviews:'Reviews', 'add-product':'Add Product' };
     document.getElementById('page-title').textContent = titles[tabName] || tabName;
     closeSidebar();
     if (tabName === 'overview') loadOverview();
     else if (tabName === 'products') loadProductsTable();
+    else if (tabName === 'categories') loadCategoriesTable();
     else if (tabName === 'orders') loadOrdersTable();
     else if (tabName === 'reviews') loadReviewsTable();
+    else if (tabName === 'add-product' && !categoryOptionsLoaded) loadCategoryOptions();
   }
 
   function openSidebar() {
@@ -535,6 +568,9 @@
       const p = data;
       document.getElementById('edit-product-id').value = id;
       document.getElementById('p-name').value = p.name||'';
+      // Load the options first, otherwise showTab would rebuild the <select>
+      // and clear the value we just set.
+      await loadCategoryOptions();
       document.getElementById('p-category').value = p.category||'';
       document.getElementById('p-price').value = p.price||'';
       document.getElementById('p-stock').value = p.stock||'';
@@ -559,6 +595,181 @@
       loadProductsTable();
     }
     catch(e) { alert('Delete failed: '+(e.message || e)); }
+  }
+
+  // ─── CATEGORIES ───
+  // products.category stores the slug, so the slug is the stable identifier
+  // and the display name can be changed freely.
+  let categoriesCache = [];
+  let categoryOptionsLoaded = false;
+
+  function slugifyCategory(name) {
+    return String(name || '').toLowerCase().trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function updateCategorySlugPreview() {
+    const slug = slugifyCategory(document.getElementById('cat-name').value);
+    document.getElementById('cat-slug-preview').textContent = slug || '—';
+  }
+
+  function showCategoryMsg(text, ok) {
+    const el = document.getElementById('category-msg');
+    el.textContent = text;
+    el.className = 'text-sm mt-3 ' + (ok ? 'text-green-600' : 'text-red-500');
+    el.classList.remove('hidden');
+  }
+
+  async function addCategory() {
+    const input = document.getElementById('cat-name');
+    const btn = document.getElementById('add-category-btn');
+    const name = input.value.trim();
+    const slug = slugifyCategory(name);
+
+    if (!name) { showCategoryMsg('Enter a category name.', false); return; }
+    if (!slug) { showCategoryMsg('That name has no letters or numbers to build a slug from.', false); return; }
+
+    btn.disabled = true;
+    try {
+      const nextOrder = categoriesCache.reduce((m, c) => Math.max(m, c.sort_order || 0), 0) + 10;
+      const { error } = await supabaseClient
+        .from('categories').insert({ name, slug, sort_order: nextOrder });
+      if (error) {
+        if (error.code === '23505') throw new Error(`"${name}" already exists.`);
+        throw error;
+      }
+      input.value = '';
+      updateCategorySlugPreview();
+      showCategoryMsg(`Added "${name}".`, true);
+      await Promise.all([loadCategoriesTable(), loadCategoryOptions()]);
+    } catch (e) {
+      showCategoryMsg('Could not add category: ' + (e.message || e), false);
+    }
+    btn.disabled = false;
+  }
+
+  async function loadCategoriesTable() {
+    const tbody = document.getElementById('categories-table');
+    const loading = document.getElementById('categories-loading');
+    loading.textContent = 'Loading…';
+    loading.classList.remove('hidden');
+    try {
+      const [catRes, prodRes] = await Promise.all([
+        supabaseClient.from('categories').select('*').order('sort_order').order('name'),
+        supabaseClient.from('products').select('category')
+      ]);
+      if (catRes.error) throw catRes.error;
+      categoriesCache = catRes.data || [];
+
+      const counts = {};
+      (prodRes.data || []).forEach(p => {
+        const k = normalizeCategoryKey(p.category);
+        counts[k] = (counts[k] || 0) + 1;
+      });
+
+      loading.classList.add('hidden');
+      if (!categoriesCache.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-text-mid py-6">No categories yet — add one above.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = categoriesCache.map(c => {
+        const n = counts[normalizeCategoryKey(c.slug)] || 0;
+        return `<tr>
+          <td class="font-medium">${escHtml(c.name)}</td>
+          <td><code class="text-xs text-text-mid">${escHtml(c.slug)}</code></td>
+          <td>${n ? `<span class="text-xs bg-secondary text-primary px-2 py-0.5 rounded-full">${n}</span>` : '<span class="text-xs text-text-mid">0</span>'}</td>
+          <td>
+            <div class="flex gap-2 flex-wrap">
+              <button onclick="renameCategory('${c.id}')" class="btn-outline text-xs px-3 py-1.5">Rename</button>
+              <button onclick="deleteCategory('${c.id}')" class="btn-danger text-xs">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      loading.classList.add('hidden');
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 py-6">Could not load categories: ${escHtml(e.message || e)}</td></tr>`;
+    }
+  }
+
+  // Renames the display name only. The slug stays put, so products that
+  // reference it keep working.
+  async function renameCategory(id) {
+    const cat = categoriesCache.find(c => c.id === id);
+    if (!cat) return;
+    const name = prompt(`Rename "${cat.name}" to:`, cat.name);
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) { alert('Name cannot be empty.'); return; }
+    if (trimmed === cat.name) return;
+
+    try {
+      const { data, error } = await supabaseClient
+        .from('categories').update({ name: trimmed }).eq('id', id).select('id');
+      if (error) {
+        if (error.code === '23505') throw new Error(`"${trimmed}" already exists.`);
+        throw error;
+      }
+      if (!data || data.length === 0) throw new Error('Nothing was updated. Your account may not have admin rights.');
+      await Promise.all([loadCategoriesTable(), loadCategoryOptions()]);
+    } catch (e) {
+      alert('Rename failed: ' + (e.message || e));
+    }
+  }
+
+  async function deleteCategory(id) {
+    const cat = categoriesCache.find(c => c.id === id);
+    if (!cat) return;
+
+    // Deleting a category that still has products would leave them filtered out
+    // of the storefront entirely, so require reassignment first.
+    try {
+      const { data: prods } = await supabaseClient
+        .from('products').select('name').eq('category', cat.slug).limit(5);
+      if (prods && prods.length) {
+        const names = prods.map(p => `"${p.name}"`).join(', ');
+        alert(`"${cat.name}" still has products (${names}${prods.length === 5 ? ', …' : ''}).\n\nReassign them to another category first.`);
+        return;
+      }
+    } catch (e) { /* fall through to the delete attempt */ }
+
+    if (!confirm(`Delete the category "${cat.name}"?`)) return;
+    try {
+      const { data, error } = await supabaseClient
+        .from('categories').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Nothing was deleted. Your account may not have admin rights.');
+      await Promise.all([loadCategoriesTable(), loadCategoryOptions()]);
+    } catch (e) {
+      alert('Delete failed: ' + (e.message || e));
+    }
+  }
+
+  // Rebuilds the product form's <select> from the categories table. If the
+  // table is missing the static options in the markup stay in place.
+  async function loadCategoryOptions() {
+    const select = document.getElementById('p-category');
+    if (!select) return;
+    const previous = select.value;
+    try {
+      const { data, error } = await supabaseClient
+        .from('categories').select('name,slug').order('sort_order').order('name');
+      if (error) throw error;
+      if (!data || !data.length) return;
+      categoriesCache = categoriesCache.length ? categoriesCache : data;
+      select.innerHTML = '<option value="">Select category…</option>' +
+        data.map(c => `<option value="${escHtml(c.slug)}">${escHtml(c.name)}</option>`).join('');
+      if (previous && data.some(c => c.slug === previous)) select.value = previous;
+      categoryOptionsLoaded = true;
+    } catch (e) {
+      console.warn('Could not load categories; keeping the built-in list.', e.message);
+    }
+  }
+
+  function normalizeCategoryKey(v) {
+    return String(v || '').toLowerCase().trim().replace(/[_]+/g, ' ').replace(/\s+/g, ' ');
   }
 
   // ─── REVIEWS ───
