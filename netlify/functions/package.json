@@ -1,12 +1,10 @@
 {
   "name": "og-edibles-netlify-functions",
-  "version": "2.0.0",
-  "description": "Netlify Functions for OG EDIBLES1738 — product upload and checkout backend",
+  "version": "3.0.0",
+  "description": "Netlify Functions for OG EDIBLES1738 — Supabase checkout + Resend emails + admin session check",
   "engines": { "node": ">=18.0.0" },
   "dependencies": {
-    "firebase-admin": "^12.0.0",
-    "cloudinary": "^2.0.0",
-    "google-auth-library": "^9.0.0",
-    "google-spreadsheet": "^4.1.1"
+    "@supabase/supabase-js": "^2.45.0",
+    "resend": "^3.5.0"
   }
 }

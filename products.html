@@ -138,8 +138,9 @@
     </div>
   </div>
 
-  <!-- Filters -->
-  <div class="flex flex-wrap gap-2 mb-6">
+  <!-- Filters: rebuilt from the categories table. The buttons below are the
+       fallback if that table has not been created yet. -->
+  <div id="filter-bar" class="flex flex-wrap gap-2 mb-6">
     <button class="filter-btn active" data-filter="all">All</button>
     <button class="filter-btn" data-filter="flower">Flower</button>
     <button class="filter-btn" data-filter="edibles">Edibles</button>
@@ -214,22 +215,20 @@
 </button>
 
 <!-- WhatsApp FAB -->
-<a href="https://wa.me/27000000000" target="_blank"
+<a href="https://wa.me/27637572748" target="_blank"
    class="fixed bottom-6 right-4 z-40 w-14 h-14 rounded-full flex items-center justify-center shadow-xl bg-green-500 hover:bg-green-600 transition text-white">
   <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M20.52 3.48A11.91 11.91 0 0012.07 0C5.44 0 .04 5.4.04 12.03c0 2.12.55 4.18 1.6 6.01L0 24l6.15-1.61a12.03 12.03 0 005.92 1.51h.01c6.63 0 12.03-5.4 12.03-12.03 0-3.21-1.25-6.23-3.59-8.39z"/></svg>
 </a>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
-<script src="firebase-config.js"></script>
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 
 <script>
   let allProducts = [];
   let cart = JSON.parse(localStorage.getItem('og1738_cart') || '[]');
   let currentFilter = 'all';
+  let categoryNames = {};   // slug -> display name, filled from the categories table
 
   function normalizeCategory(v) {
     return String(v||'').toLowerCase().trim().replace(/[_]+/g,' ').replace(/\s*-\s*/g,'-').replace(/\s+/g,' ');
@@ -310,14 +309,42 @@
 
   function goToCheckout() { if (cart.length) window.location.href = 'checkout.html'; }
 
-  document.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentFilter = btn.dataset.filter;
-      renderProducts();
-    });
+  // Delegated so the bar keeps working after being rebuilt from the database.
+  document.getElementById('filter-bar').addEventListener('click', (e) => {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    renderProducts();
   });
+
+  function buildFilterBar(categories) {
+    const bar = document.getElementById('filter-bar');
+    if (!bar || !categories || !categories.length) return;  // keep the static fallback
+    categoryNames = {};
+    categories.forEach(c => { categoryNames[c.slug] = c.name; });
+    bar.innerHTML = '<button class="filter-btn' + (currentFilter === 'all' ? ' active' : '') +
+        '" data-filter="all">All</button>' +
+      categories.map(c => `<button class="filter-btn${currentFilter === c.slug ? ' active' : ''}" data-filter="${escHtml(c.slug)}">${escHtml(c.name)}</button>`).join('');
+  }
+
+  async function loadCategories() {
+    try {
+      const { data, error } = await supabaseClient
+        .from('categories').select('name,slug').order('sort_order').order('name');
+      if (error) throw error;
+      buildFilterBar(data);
+      // Re-render so badges pick up the display names; loadCategories and
+      // loadProducts race, and either may finish first.
+      if (allProducts.length) renderProducts();
+    } catch (e) {
+      // Older project without the categories table: the hardcoded bar still works.
+      console.warn('Category list unavailable; using the built-in filters.', e.message);
+    }
+  }
+
+  function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
   function renderProducts() {
     const grid = document.getElementById('products-grid');
@@ -336,7 +363,7 @@
                  alt="${p.name}" class="w-full h-36 sm:h-44 object-cover"
                  onerror="this.src='https://placehold.co/400x280/E5F3E7/1E4D2B?text=Product'">
             <span class="badge ${inStock?'badge-instock':'badge-out'}">${inStock?'In Stock':'Sold Out'}</span>
-            ${p.category?`<span class="absolute top-8 left-8 text-xs bg-accent/80 text-white px-2 py-0.5 rounded-full capitalize">${p.category}</span>`:''}
+            ${p.category?`<span class="absolute top-8 left-8 text-xs bg-accent/80 text-white px-2 py-0.5 rounded-full capitalize">${escHtml(categoryNames[p.category] || p.category)}</span>`:''}
           </div>
           <div class="p-3 sm:p-4">
             <h3 class="font-semibold text-text-dark text-sm leading-tight mb-1 line-clamp-2">${p.name}</h3>
@@ -356,16 +383,28 @@
   }
 
   async function loadProducts() {
+    if (!supabaseConfigured) {
+      document.getElementById('products-grid').innerHTML =
+        `<div class="col-span-full text-center py-8 text-text-mid">Supabase isn't configured yet. Add your project URL and anon key to <code>supabase-config.js</code>.</div>`;
+      return;
+    }
     try {
-      const snap = await db.collection('products').orderBy('createdAt','desc').get();
-      allProducts = snap.docs.map(d => ({id:d.id,...d.data()}));
+      const { data, error } = await supabaseClient
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      allProducts = (data || []).map(p => ({ id:p.id, ...p, imageUrl:p.image_url }));
       renderProducts();
     } catch(e) {
       console.error(e);
-      document.getElementById('products-grid').innerHTML = `<div class="col-span-full text-center py-8 text-red-500">Failed to load products. Check Firebase config.</div>`;
+      document.getElementById('products-grid').innerHTML = supabaseConfigured
+        ? `<div class="col-span-full text-center py-8 text-red-500">Failed to load products. Please try again.</div>`
+        : `<div class="col-span-full text-center py-8 text-text-mid">Supabase isn't configured yet. Add your project URL and anon key to <code>supabase-config.js</code>.</div>`;
     }
   }
 
+  loadCategories();
   loadProducts();
   updateCartUI();
 </script>

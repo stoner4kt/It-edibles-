@@ -110,6 +110,7 @@
         <input type="password" id="admin-password" class="field" placeholder="••••••••">
       </div>
       <button onclick="adminLogin()" class="btn-accent w-full py-3 text-base">Sign In</button>
+      <button onclick="sendMagicLink()" class="btn-outline w-full py-2.5 text-sm">Email me a magic link instead</button>
       <p id="login-error" class="text-red-500 text-sm text-center hidden"></p>
     </div>
   </div>
@@ -132,7 +133,9 @@
   <nav class="p-3 space-y-1 mt-3">
     <div class="sidebar-link active" onclick="showTab('overview')"><span class="icon">📊</span> Overview</div>
     <div class="sidebar-link" onclick="showTab('products')"><span class="icon">🌿</span> Products</div>
+    <div class="sidebar-link" onclick="showTab('categories')"><span class="icon">🏷️</span> Categories</div>
     <div class="sidebar-link" onclick="showTab('orders')"><span class="icon">📦</span> Orders</div>
+    <div class="sidebar-link" onclick="showTab('reviews')"><span class="icon">⭐</span> Reviews</div>
     <div class="sidebar-link" onclick="showTab('add-product')"><span class="icon">➕</span> Add Product</div>
   </nav>
   <div class="absolute bottom-6 left-0 right-0 px-4">
@@ -197,6 +200,34 @@
       </div>
     </div>
 
+    <!-- ─── CATEGORIES ─── -->
+    <div id="tab-categories" class="tab-content hidden">
+      <div class="mb-6">
+        <h3 class="text-lg font-extrabold text-primary">Product Categories</h3>
+        <p class="text-sm text-text-mid">These drive the storefront filter bar and the product form's category list. The slug is fixed once created, so renaming a category is safe and never touches existing products.</p>
+      </div>
+      <div class="card mb-6">
+        <h4 class="font-bold text-primary mb-3">Add a category</h4>
+        <div class="flex flex-wrap gap-3 items-end">
+          <div class="flex-1 min-w-[200px]">
+            <label class="field-label">Name *</label>
+            <input type="text" id="cat-name" class="field" placeholder="e.g. Concentrates"
+                   oninput="updateCategorySlugPreview()" onkeydown="if(event.key==='Enter')addCategory()">
+            <p class="text-xs text-text-mid mt-1">Slug: <code id="cat-slug-preview">—</code></p>
+          </div>
+          <button onclick="addCategory()" id="add-category-btn" class="btn-accent text-sm">+ Add Category</button>
+        </div>
+        <p id="category-msg" class="text-sm mt-3 hidden"></p>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table><thead><tr><th>Category</th><th>Slug</th><th>Products</th><th>Actions</th></tr></thead>
+          <tbody id="categories-table"></tbody></table>
+        </div>
+        <p id="categories-loading" class="text-center text-text-mid py-6">Loading…</p>
+      </div>
+    </div>
+
     <!-- ─── ORDERS ─── -->
     <div id="tab-orders" class="tab-content hidden">
       <div class="flex flex-wrap gap-3 mb-6">
@@ -215,6 +246,30 @@
       </div>
     </div>
 
+    <!-- ─── REVIEWS ─── -->
+    <div id="tab-reviews" class="tab-content hidden">
+      <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <div>
+          <h3 class="text-lg font-extrabold text-primary">Customer Reviews</h3>
+          <p class="text-sm text-text-mid">Anyone can post a review, so remove anything that looks like spam.</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button class="tab-btn active" data-rating="all" onclick="filterReviews('all',this)">All</button>
+          <button class="tab-btn" data-rating="5" onclick="filterReviews('5',this)">5★</button>
+          <button class="tab-btn" data-rating="4" onclick="filterReviews('4',this)">4★</button>
+          <button class="tab-btn" data-rating="3" onclick="filterReviews('3',this)">3★</button>
+          <button class="tab-btn" data-rating="low" onclick="filterReviews('low',this)">≤2★</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table><thead><tr><th>Rating</th><th>Name</th><th>Review</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody id="reviews-table"></tbody></table>
+        </div>
+        <p id="reviews-loading" class="text-center text-text-mid py-6">Loading…</p>
+      </div>
+    </div>
+
     <!-- ─── ADD/EDIT PRODUCT ─── -->
     <div id="tab-add-product" class="tab-content hidden max-w-2xl">
       <div class="card">
@@ -228,6 +283,8 @@
             </div>
             <div>
               <label class="field-label">Category *</label>
+              <!-- Replaced at runtime from the categories table; these options
+                   are the fallback if that table has not been created yet. -->
               <select id="p-category" class="field">
                 <option value="">Select category…</option>
                 <option value="edibles">Edibles</option>
@@ -302,58 +359,105 @@
   </div>
 </div>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
-<script src="firebase-config.js"></script>
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 
 <script>
   let allOrders = [];
   let editingProductImageUrl = null;
   let newProductImageFile = null;
 
-  // ─── AUTH ───
+  // ─── AUTH (Supabase) ───
+  function showLoginError(msg) {
+    const err = document.getElementById('login-error');
+    err.textContent = msg;
+    err.className = 'text-center text-sm mt-3 text-red-500';
+    err.classList.remove('hidden');
+  }
+
+  // Reads the caller's own profile row. RLS only exposes a user's own profile,
+  // so a non-admin can never see is_admin = true for someone else.
+  async function isCurrentUserAdmin(userId) {
+    const { data: profile, error } = await supabaseClient
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) { console.error('profile lookup failed', error); return false; }
+    return !!profile?.is_admin;
+  }
+
+  async function checkAdminAndEnter(user) {
+    if (!user) return;
+    if (!(await isCurrentUserAdmin(user.id))) {
+      await supabaseClient.auth.signOut();
+      showLoginError('Access denied. Not an admin account.');
+      return;
+    }
+    enterDashboard(user.email);
+  }
+
+  function enterDashboard(email) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('admin-name').textContent = email;
+    document.getElementById('admin-name').classList.remove('hidden');
+    loadDashboard();
+  }
+
   async function adminLogin() {
-    const email = document.getElementById('admin-email').value;
+    const email = document.getElementById('admin-email').value.trim();
     const pw    = document.getElementById('admin-password').value;
     const err   = document.getElementById('login-error');
     err.classList.add('hidden');
+    if (!email) { showLoginError('Please enter your email.'); return; }
+    if (!pw)    { showLoginError('Please enter your password.'); return; }
+
     try {
-      const cred = await auth.signInWithEmailAndPassword(email, pw);
-      const adminDoc = await db.collection('admins').doc(cred.user.uid).get();
-      if (!adminDoc.exists || !adminDoc.data().isAdmin) {
-        await auth.signOut();
-        err.textContent = 'Access denied. Not an admin account.';
-        err.classList.remove('hidden');
-        return;
-      }
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('admin-name').textContent = cred.user.email;
-      document.getElementById('admin-name').classList.remove('hidden');
-      loadDashboard();
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pw });
+      if (error) throw error;
+      await checkAdminAndEnter(data.user);
     } catch(e) {
-      err.textContent = e.message;
+      showLoginError(e.message || 'Login failed.');
+    }
+  }
+
+  async function sendMagicLink() {
+    const email = document.getElementById('admin-email').value.trim();
+    const err = document.getElementById('login-error');
+    err.classList.add('hidden');
+    if (!email) { showLoginError('Please enter your email first.'); return; }
+    try {
+      const { error } = await supabaseClient.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.origin + window.location.pathname }
+      });
+      if (error) throw error;
+      err.textContent = 'Magic link sent to ' + email + '. Open it in this browser to sign in.';
+      err.className = 'text-center text-sm mt-3 text-primary';
       err.classList.remove('hidden');
+    } catch(e) {
+      showLoginError(e.message || 'Could not send magic link.');
     }
   }
 
   document.getElementById('admin-password').addEventListener('keydown', e => { if (e.key === 'Enter') adminLogin(); });
+  document.getElementById('admin-email').addEventListener('keydown', e => { if (e.key === 'Enter') adminLogin(); });
 
-  async function adminLogout() { await auth.signOut(); document.getElementById('login-screen').style.display = 'flex'; }
+  async function adminLogout() {
+    await supabaseClient.auth.signOut();
+    document.getElementById('login-screen').style.display = 'flex';
+  }
 
-  auth.onAuthStateChanged(async user => {
-    if (user) {
-      try {
-        const adminDoc = await db.collection('admins').doc(user.uid).get();
-        if (adminDoc.exists && adminDoc.data().isAdmin) {
-          document.getElementById('login-screen').style.display = 'none';
-          document.getElementById('admin-name').textContent = user.email;
-          document.getElementById('admin-name').classList.remove('hidden');
-          loadDashboard();
-        }
-      } catch(e) {}
+  // Restore an existing session on load, and react to the magic-link redirect
+  // (supabase-js parses the tokens from the URL automatically).
+  (async function initAuth() {
+    const { data } = await supabaseClient.auth.getSession();
+    if (data.session) await checkAdminAndEnter(data.session.user);
+  })();
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+      checkAdminAndEnter(session.user);
     }
   });
 
@@ -365,12 +469,15 @@
       l.classList.remove('active');
       if (l.getAttribute('onclick').includes(tabName)) l.classList.add('active');
     });
-    const titles = { overview:'Overview', products:'Products', orders:'Orders', 'add-product':'Add Product' };
+    const titles = { overview:'Overview', products:'Products', categories:'Categories', orders:'Orders', reviews:'Reviews', 'add-product':'Add Product' };
     document.getElementById('page-title').textContent = titles[tabName] || tabName;
     closeSidebar();
     if (tabName === 'overview') loadOverview();
     else if (tabName === 'products') loadProductsTable();
+    else if (tabName === 'categories') loadCategoriesTable();
     else if (tabName === 'orders') loadOrdersTable();
+    else if (tabName === 'reviews') loadReviewsTable();
+    else if (tabName === 'add-product' && !categoryOptionsLoaded) loadCategoryOptions();
   }
 
   function openSidebar() {
@@ -385,12 +492,12 @@
   // ─── OVERVIEW ───
   async function loadOverview() {
     try {
-      const [prodSnap, ordSnap] = await Promise.all([
-        db.collection('products').get(),
-        db.collection('orders').orderBy('createdAt','desc').limit(20).get()
+      const [prodRes, ordRes] = await Promise.all([
+        supabaseClient.from('products').select('id', { count: 'exact', head: true }),
+        supabaseClient.from('orders').select('*').order('created_at', { ascending: false }).limit(20)
       ]);
-      document.getElementById('stat-products').textContent = prodSnap.size;
-      const orders = ordSnap.docs.map(d => ({id:d.id,...d.data()}));
+      document.getElementById('stat-products').textContent = prodRes.count ?? 0;
+      const orders = (ordRes.data || []).map(d => ({id:d.id,...d}));
       allOrders = orders;
       document.getElementById('stat-pending').textContent = orders.filter(o => o.status==='pending').length;
       document.getElementById('stat-orders').textContent = orders.length;
@@ -408,7 +515,7 @@
         <td class="font-medium">${escHtml(o.customerName||'–')}</td>
         <td class="font-bold text-primary">R${getOrderTotal(o)}</td>
         <td><span class="status-badge status-${o.status||'pending'}">${o.status||'pending'}</span></td>
-        <td class="text-xs text-text-mid">${o.createdAt?.toDate?o.createdAt.toDate().toLocaleDateString('en-ZA'):'–'}</td>
+        <td class="text-xs text-text-mid">${o.created_at?new Date(o.created_at).toLocaleDateString('en-ZA'):'–'}</td>
         <td><button onclick="viewOrderDetail('${o.id}')" class="btn-outline text-xs px-3 py-1.5">View</button></td>
       </tr>`).join('');
   }
@@ -419,11 +526,15 @@
     const loading = document.getElementById('products-loading');
     loading.textContent = 'Loading…';
     try {
-      const snap = await db.collection('products').orderBy('createdAt','desc').get();
+      const { data, error } = await supabaseClient
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
       loading.classList.add('hidden');
-      if (snap.empty) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-text-mid py-6">No products yet.</td></tr>'; return; }
-      tbody.innerHTML = snap.docs.map(doc => {
-        const p = {id:doc.id,...doc.data()};
+      if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="text-center text-text-mid py-6">No products yet.</td></tr>'; return; }
+      tbody.innerHTML = data.map(p => {
+        p.imageUrl = p.image_url;
         return `<tr>
           <td><img src="${p.imageUrl||'https://placehold.co/60x60/E5F3E7/1E4D2B?text=P'}" class="w-12 h-12 object-cover rounded-lg" onerror="this.src='https://placehold.co/60x60/E5F3E7/1E4D2B?text=P'"></td>
           <td class="font-medium max-w-[150px]"><p class="truncate">${escHtml(p.name)}</p>${p.description?`<p class="text-xs text-text-mid truncate">${escHtml(p.description)}</p>`:''}</td>
@@ -446,21 +557,25 @@
   }
 
   async function updateStock(id, val) {
-    try { await db.collection('products').doc(id).update({ stock: parseInt(val)||0 }); }
+    try { await supabaseClient.from('products').update({ stock: parseInt(val)||0 }).eq('id', id); }
     catch(e) { alert('Failed to update stock: '+e.message); }
   }
 
   async function editProduct(id) {
     try {
-      const doc = await db.collection('products').doc(id).get();
-      const p = doc.data();
+      const { data, error } = await supabaseClient.from('products').select('*').eq('id', id).maybeSingle();
+      if (error) throw error;
+      const p = data;
       document.getElementById('edit-product-id').value = id;
       document.getElementById('p-name').value = p.name||'';
+      // Load the options first, otherwise showTab would rebuild the <select>
+      // and clear the value we just set.
+      await loadCategoryOptions();
       document.getElementById('p-category').value = p.category||'';
       document.getElementById('p-price').value = p.price||'';
       document.getElementById('p-stock').value = p.stock||'';
       document.getElementById('p-desc').value = p.description||'';
-      editingProductImageUrl = p.imageUrl||null;
+      editingProductImageUrl = p.imageUrl||p.image_url||null;
       if (editingProductImageUrl) {
         document.getElementById('current-image-url').classList.remove('hidden');
         document.getElementById('p-upload-placeholder').innerHTML = `<img src="${editingProductImageUrl}" class="max-h-20 mx-auto rounded mb-2 opacity-70"><p class="text-xs text-text-mid">Current image (click to replace)</p>`;
@@ -472,8 +587,265 @@
 
   async function deleteProduct(id, name) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
-    try { await db.collection('products').doc(id).delete(); loadProductsTable(); }
-    catch(e) { alert('Delete failed: '+e.message); }
+    try {
+      const { data, error } = await supabaseClient
+        .from('products').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Nothing was deleted. Your account may not have admin rights.');
+      loadProductsTable();
+    }
+    catch(e) { alert('Delete failed: '+(e.message || e)); }
+  }
+
+  // ─── CATEGORIES ───
+  // products.category stores the slug, so the slug is the stable identifier
+  // and the display name can be changed freely.
+  let categoriesCache = [];
+  let categoryOptionsLoaded = false;
+
+  function slugifyCategory(name) {
+    return String(name || '').toLowerCase().trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function updateCategorySlugPreview() {
+    const slug = slugifyCategory(document.getElementById('cat-name').value);
+    document.getElementById('cat-slug-preview').textContent = slug || '—';
+  }
+
+  function showCategoryMsg(text, ok) {
+    const el = document.getElementById('category-msg');
+    el.textContent = text;
+    el.className = 'text-sm mt-3 ' + (ok ? 'text-green-600' : 'text-red-500');
+    el.classList.remove('hidden');
+  }
+
+  async function addCategory() {
+    const input = document.getElementById('cat-name');
+    const btn = document.getElementById('add-category-btn');
+    const name = input.value.trim();
+    const slug = slugifyCategory(name);
+
+    if (!name) { showCategoryMsg('Enter a category name.', false); return; }
+    if (!slug) { showCategoryMsg('That name has no letters or numbers to build a slug from.', false); return; }
+
+    btn.disabled = true;
+    try {
+      const nextOrder = categoriesCache.reduce((m, c) => Math.max(m, c.sort_order || 0), 0) + 10;
+      const { error } = await supabaseClient
+        .from('categories').insert({ name, slug, sort_order: nextOrder });
+      if (error) {
+        if (error.code === '23505') throw new Error(`"${name}" already exists.`);
+        throw error;
+      }
+      input.value = '';
+      updateCategorySlugPreview();
+      showCategoryMsg(`Added "${name}".`, true);
+      await Promise.all([loadCategoriesTable(), loadCategoryOptions()]);
+    } catch (e) {
+      showCategoryMsg('Could not add category: ' + (e.message || e), false);
+    }
+    btn.disabled = false;
+  }
+
+  async function loadCategoriesTable() {
+    const tbody = document.getElementById('categories-table');
+    const loading = document.getElementById('categories-loading');
+    loading.textContent = 'Loading…';
+    loading.classList.remove('hidden');
+    try {
+      const [catRes, prodRes] = await Promise.all([
+        supabaseClient.from('categories').select('*').order('sort_order').order('name'),
+        supabaseClient.from('products').select('category')
+      ]);
+      if (catRes.error) throw catRes.error;
+      categoriesCache = catRes.data || [];
+
+      const counts = {};
+      (prodRes.data || []).forEach(p => {
+        const k = normalizeCategoryKey(p.category);
+        counts[k] = (counts[k] || 0) + 1;
+      });
+
+      loading.classList.add('hidden');
+      if (!categoriesCache.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-text-mid py-6">No categories yet — add one above.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = categoriesCache.map(c => {
+        const n = counts[normalizeCategoryKey(c.slug)] || 0;
+        return `<tr>
+          <td class="font-medium">${escHtml(c.name)}</td>
+          <td><code class="text-xs text-text-mid">${escHtml(c.slug)}</code></td>
+          <td>${n ? `<span class="text-xs bg-secondary text-primary px-2 py-0.5 rounded-full">${n}</span>` : '<span class="text-xs text-text-mid">0</span>'}</td>
+          <td>
+            <div class="flex gap-2 flex-wrap">
+              <button onclick="renameCategory('${c.id}')" class="btn-outline text-xs px-3 py-1.5">Rename</button>
+              <button onclick="deleteCategory('${c.id}')" class="btn-danger text-xs">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      loading.classList.add('hidden');
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-red-500 py-6">Could not load categories: ${escHtml(e.message || e)}</td></tr>`;
+    }
+  }
+
+  // Renames the display name only. The slug stays put, so products that
+  // reference it keep working.
+  async function renameCategory(id) {
+    const cat = categoriesCache.find(c => c.id === id);
+    if (!cat) return;
+    const name = prompt(`Rename "${cat.name}" to:`, cat.name);
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (!trimmed) { alert('Name cannot be empty.'); return; }
+    if (trimmed === cat.name) return;
+
+    try {
+      const { data, error } = await supabaseClient
+        .from('categories').update({ name: trimmed }).eq('id', id).select('id');
+      if (error) {
+        if (error.code === '23505') throw new Error(`"${trimmed}" already exists.`);
+        throw error;
+      }
+      if (!data || data.length === 0) throw new Error('Nothing was updated. Your account may not have admin rights.');
+      await Promise.all([loadCategoriesTable(), loadCategoryOptions()]);
+    } catch (e) {
+      alert('Rename failed: ' + (e.message || e));
+    }
+  }
+
+  async function deleteCategory(id) {
+    const cat = categoriesCache.find(c => c.id === id);
+    if (!cat) return;
+
+    // Deleting a category that still has products would leave them filtered out
+    // of the storefront entirely, so require reassignment first.
+    try {
+      const { data: prods } = await supabaseClient
+        .from('products').select('name').eq('category', cat.slug).limit(5);
+      if (prods && prods.length) {
+        const names = prods.map(p => `"${p.name}"`).join(', ');
+        alert(`"${cat.name}" still has products (${names}${prods.length === 5 ? ', …' : ''}).\n\nReassign them to another category first.`);
+        return;
+      }
+    } catch (e) { /* fall through to the delete attempt */ }
+
+    if (!confirm(`Delete the category "${cat.name}"?`)) return;
+    try {
+      const { data, error } = await supabaseClient
+        .from('categories').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Nothing was deleted. Your account may not have admin rights.');
+      await Promise.all([loadCategoriesTable(), loadCategoryOptions()]);
+    } catch (e) {
+      alert('Delete failed: ' + (e.message || e));
+    }
+  }
+
+  // Rebuilds the product form's <select> from the categories table. If the
+  // table is missing the static options in the markup stay in place.
+  async function loadCategoryOptions() {
+    const select = document.getElementById('p-category');
+    if (!select) return;
+    const previous = select.value;
+    try {
+      const { data, error } = await supabaseClient
+        .from('categories').select('name,slug').order('sort_order').order('name');
+      if (error) throw error;
+      if (!data || !data.length) return;
+      categoriesCache = categoriesCache.length ? categoriesCache : data;
+      select.innerHTML = '<option value="">Select category…</option>' +
+        data.map(c => `<option value="${escHtml(c.slug)}">${escHtml(c.name)}</option>`).join('');
+      if (previous && data.some(c => c.slug === previous)) select.value = previous;
+      categoryOptionsLoaded = true;
+    } catch (e) {
+      console.warn('Could not load categories; keeping the built-in list.', e.message);
+    }
+  }
+
+  function normalizeCategoryKey(v) {
+    return String(v || '').toLowerCase().trim().replace(/[_]+/g, ' ').replace(/\s+/g, ' ');
+  }
+
+  // ─── REVIEWS ───
+  // Reviews are anonymous user input. Row actions are keyed by id only and the
+  // name/comment are escaped into the cell, never into an inline handler.
+  let reviewsCache = [];
+  let reviewFilter = 'all';
+
+  async function loadReviewsTable() {
+    const tbody = document.getElementById('reviews-table');
+    const loading = document.getElementById('reviews-loading');
+    loading.textContent = 'Loading…';
+    loading.classList.remove('hidden');
+    try {
+      const { data, error } = await supabaseClient
+        .from('reviews')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      reviewsCache = data || [];
+      loading.classList.add('hidden');
+      renderReviewsTable();
+    } catch (e) {
+      loading.textContent = 'Error loading reviews.';
+    }
+  }
+
+  function filterReviews(value, btn) {
+    reviewFilter = value;
+    document.querySelectorAll('#tab-reviews .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderReviewsTable();
+  }
+
+  function renderReviewsTable() {
+    const tbody = document.getElementById('reviews-table');
+    let rows = reviewsCache;
+    if (reviewFilter === 'low') rows = rows.filter(r => (r.rating || 0) <= 2);
+    else if (reviewFilter !== 'all') rows = rows.filter(r => String(r.rating) === reviewFilter);
+
+    if (rows.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-text-mid py-6">${
+        reviewsCache.length ? 'No reviews match this filter.' : 'No reviews yet.'
+      }</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => {
+      const rating = Math.max(0, Math.min(5, parseInt(r.rating) || 0));
+      const date = r.created_at ? new Date(r.created_at).toLocaleDateString() : '–';
+      return `<tr>
+        <td class="whitespace-nowrap text-accent font-bold">${'★'.repeat(rating)}<span class="text-text-mid/40">${'★'.repeat(5 - rating)}</span></td>
+        <td class="font-medium max-w-[140px]"><p class="truncate">${escHtml(r.name || 'Anonymous')}</p></td>
+        <td class="text-sm text-text-mid max-w-[320px]"><p class="truncate" title="${escHtml(r.comment || '')}">${escHtml(r.comment || '–')}</p></td>
+        <td class="text-xs text-text-mid whitespace-nowrap">${date}</td>
+        <td><button onclick="deleteReview('${r.id}')" class="btn-danger text-xs">Delete</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function deleteReview(id) {
+    const r = reviewsCache.find(x => x.id === id);
+    const label = r ? `"${r.name || 'Anonymous'}: ${(r.comment || '').slice(0, 60)}${(r.comment||'').length > 60 ? '…' : ''}"` : 'this review';
+    if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+    try {
+      // RLS silently removes rows the caller may not delete, and supabase-js
+      // reports that as success with an empty payload. Ask for the deleted rows
+      // back so a blocked delete is caught instead of looking like it worked.
+      const { data, error } = await supabaseClient
+        .from('reviews').delete().eq('id', id).select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Nothing was deleted. Your account may not have admin rights — check profiles.is_admin.');
+      }
+      reviewsCache = reviewsCache.filter(x => x.id !== id);
+      renderReviewsTable();
+    } catch (e) { alert('Delete failed: ' + (e.message || e)); }
   }
 
   function handleProductImage(input) {
@@ -498,13 +870,16 @@
     document.getElementById('p-image-preview').classList.add('hidden');
   }
 
-  function fileToBase64(file) {
-    return new Promise((res,rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result);
-      r.onerror = () => rej(new Error('Failed to read file.'));
-      r.readAsDataURL(file);
-    });
+  // Upload an image file to Supabase Storage (product-images bucket).
+  // Returns the public URL of the uploaded image.
+  async function uploadProductImage(file) {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanName = (file.name.replace(/\.[^.]+$/, '') || 'product').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const path = `${Date.now()}-${cleanName}.${ext}`;
+    const { error } = await supabaseClient.storage.from('product-images').upload(path, file, { upsert: false });
+    if (error) throw new Error('Image upload failed: ' + (error.message||error));
+    const { data: pub } = supabaseClient.storage.from('product-images').getPublicUrl(path);
+    return pub.publicUrl;
   }
 
   async function saveProduct() {
@@ -516,6 +891,9 @@
     const stock    = parseInt(document.getElementById('p-stock').value);
     const desc     = document.getElementById('p-desc').value.trim();
     const editId   = document.getElementById('edit-product-id').value;
+    const progressEl = document.getElementById('p-upload-progress');
+    const barEl = document.getElementById('p-upload-bar');
+    const pctEl = document.getElementById('p-upload-pct');
     msg.classList.add('hidden');
 
     if (!name || !category || isNaN(price) || isNaN(stock)) {
@@ -529,42 +907,33 @@
     btn.textContent = newProductImageFile ? 'Uploading…' : 'Saving…';
 
     try {
+      let imageUrl = editingProductImageUrl || null;
+      if (newProductImageFile) {
+        progressEl.classList.remove('hidden');
+        pctEl.textContent = 'Uploading…';
+        barEl.style.width = '50%';
+        imageUrl = await uploadProductImage(newProductImageFile);
+        barEl.style.width = '100%';
+        pctEl.textContent = '100%';
+      }
+
+      const productData = {
+        name, category, price, stock,
+        description: desc,
+        image_url: imageUrl
+      };
+
       if (editId) {
-        let imageUrl = editingProductImageUrl;
-        if (newProductImageFile) {
-          const imageBase64 = await fileToBase64(newProductImageFile);
-          document.getElementById('p-upload-progress').classList.remove('hidden');
-          const res  = await fetch('/.netlify/functions/save-data?action=upload-product', {
-            method: 'POST', headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({name,price,stock,category,description:desc,image:imageBase64})
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error||'Upload failed');
-          imageUrl = json.imageUrl;
-          if (json.productId) await db.collection('products').doc(json.productId).delete();
-        }
-        await db.collection('products').doc(editId).update({
-          name, category, price, stock, description: desc,
-          imageUrl: imageUrl||null,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        const { error } = await supabaseClient.from('products').update(productData).eq('id', editId);
+        if (error) throw error;
         msg.textContent = 'Product updated successfully!';
       } else {
-        if (!newProductImageFile) throw new Error('Please select a product image.');
-        const imageBase64 = await fileToBase64(newProductImageFile);
-        document.getElementById('p-upload-progress').classList.remove('hidden');
-        document.getElementById('p-upload-bar').style.width = '50%';
-        document.getElementById('p-upload-pct').textContent = 'Uploading…';
-        const res  = await fetch('/.netlify/functions/save-data?action=upload-product', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({name,price,stock,category,description:desc,image:imageBase64})
-        });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error||'Upload failed');
-        document.getElementById('p-upload-bar').style.width = '100%';
-        document.getElementById('p-upload-pct').textContent = '100%';
+        if (!imageUrl && !newProductImageFile) throw new Error('Please select a product image.');
+        const { error } = await supabaseClient.from('products').insert(productData);
+        if (error) throw error;
         msg.textContent = 'Product added successfully!';
       }
+
       msg.className = 'text-sm text-center text-green-600 mt-3';
       msg.classList.remove('hidden');
       resetProductForm();
@@ -602,8 +971,12 @@
     const loading = document.getElementById('orders-loading');
     loading.textContent = 'Loading…';
     try {
-      const snap = await db.collection('orders').orderBy('createdAt','desc').get();
-      allOrders = snap.docs.map(d => ({id:d.id,...d.data()}));
+      const { data, error } = await supabaseClient
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      allOrders = (data || []).map(d => ({ id:d.id, ...d }));
       loading.classList.add('hidden');
       renderOrdersTable(allOrders);
     } catch(e) { loading.textContent = 'Error loading orders.'; }
@@ -619,7 +992,7 @@
     const tbody = document.getElementById('orders-table');
     if (!orders.length) { tbody.innerHTML='<tr><td colspan="7" class="text-center text-text-mid py-6">No orders found.</td></tr>'; return; }
     tbody.innerHTML = orders.map(o => {
-      const date = o.createdAt?.toDate ? o.createdAt.toDate().toLocaleDateString('en-ZA') : '–';
+      const date = o.created_at ? new Date(o.created_at).toLocaleDateString('en-ZA') : '–';
       const items = (o.items||[]).map(i => `${i.name} ×${i.qty}`).join(', ');
       return `<tr>
         <td class="font-mono text-xs text-accent">${escHtml(o.orderId||o.id.slice(0,8)+'…')}</td>
@@ -643,7 +1016,7 @@
 
   async function updateOrderStatus(id, status) {
     try {
-      await db.collection('orders').doc(id).update({ status, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      await supabaseClient.from('orders').update({ status }).eq('id', id);
       const o = allOrders.find(x => x.id===id);
       if (o) o.status = status;
     } catch(e) { alert('Failed: '+e.message); }
