@@ -8,6 +8,20 @@ const supabaseConfig = {
   supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp5a2xqeHlrdmN0cHpjemhkdGN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNzk4NjgsImV4cCI6MjEwODg1NTg2OH0.2I1pkxD3g8BufdQzHoBQvRNEwa25EaKxtqZUZiKzW7U"
 };
 
+// Cloudinary — admin profile picture uploads (browser, unsigned preset).
+// Cloudinary → Settings → Upload → Upload presets → Add unsigned preset.
+const cloudinaryConfig = {
+  cloudName: "kjs4dmt1",
+  uploadPreset: "og_edibles_avatars",
+  folder: "og-edibles-avatars"
+};
+
+const cloudinaryConfigured =
+  !!cloudinaryConfig.cloudName &&
+  cloudinaryConfig.cloudName !== "YOUR_CLOUDINARY_CLOUD_NAME" &&
+  !!cloudinaryConfig.uploadPreset &&
+  cloudinaryConfig.uploadPreset !== "YOUR_UNSIGNED_PRESET";
+
 // Pages use this to show a setup hint instead of a generic network error.
 const supabaseConfigured =
   !!supabaseConfig.supabaseUrl && !!supabaseConfig.supabaseAnonKey;
