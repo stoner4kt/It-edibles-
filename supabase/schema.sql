@@ -69,14 +69,20 @@ create table if not exists public.categories (
 create unique index if not exists categories_name_lower_key
   on public.categories (lower(name));
 
--- ─── Profiles (admin flags) ──────────────────────────────────
+-- ─── Profiles (admin flags + avatar) ─────────────────────────
 create table if not exists public.profiles (
-  id         uuid primary key references auth.users(id) on delete cascade,
-  email      text,
-  is_admin   boolean not null default false,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  id           uuid primary key references auth.users(id) on delete cascade,
+  email        text,
+  display_name text,
+  avatar_url   text,
+  is_admin     boolean not null default false,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
 );
+
+-- Safe upgrades for projects that already ran an older schema
+alter table public.profiles add column if not exists display_name text;
+alter table public.profiles add column if not exists avatar_url text;
 
 alter table public.products enable row level security;
 alter table public.orders   enable row level security;
