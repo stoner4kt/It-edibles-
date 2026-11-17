@@ -22,6 +22,26 @@ const cloudinaryConfigured =
   !!cloudinaryConfig.uploadPreset &&
   cloudinaryConfig.uploadPreset !== "YOUR_UNSIGNED_PRESET";
 
+// Cloudinary — "Our Story" homepage image uploads (browser, unsigned preset).
+// Reuses the avatar preset (and its matching folder) so the editor works out
+// of the box. To put story photos in their own delivery folder, create a
+// dedicated unsigned preset (Cloudinary → Settings → Upload → Upload presets
+// → Add unsigned preset, with the folder set inside the preset) and set both
+// uploadPreset and folder here to match it. The folder is sent with the
+// upload and must match the preset's configured folder or Cloudinary rejects
+// the request.
+const cloudinaryStoryConfig = {
+  cloudName: cloudinaryConfig.cloudName,
+  uploadPreset: cloudinaryConfig.uploadPreset,
+  folder: cloudinaryConfig.folder
+};
+
+const cloudinaryStoryConfigured =
+  !!cloudinaryStoryConfig.cloudName &&
+  cloudinaryStoryConfig.cloudName !== "YOUR_CLOUDINARY_CLOUD_NAME" &&
+  !!cloudinaryStoryConfig.uploadPreset &&
+  cloudinaryStoryConfig.uploadPreset !== "YOUR_UNSIGNED_PRESET";
+
 // Pages use this to show a setup hint instead of a generic network error.
 const supabaseConfigured =
   !!supabaseConfig.supabaseUrl && !!supabaseConfig.supabaseAnonKey;

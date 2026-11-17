@@ -138,6 +138,7 @@
     <div class="sidebar-link" onclick="showTab('orders')"><span class="icon">📦</span> Orders</div>
     <div class="sidebar-link" onclick="showTab('reviews')"><span class="icon">⭐</span> Reviews</div>
     <div class="sidebar-link" onclick="showTab('add-product')"><span class="icon">➕</span> Add Product</div>
+    <div class="sidebar-link" onclick="showTab('our-story')"><span class="icon">📖</span> Our Story</div>
     <div class="sidebar-link" onclick="showTab('profile')"><span class="icon">👤</span> Profile</div>
   </nav>
   <div class="absolute bottom-6 left-0 right-0 px-4">
@@ -346,6 +347,50 @@
             <button onclick="resetProductForm()" class="btn-outline flex-none px-6 py-3">Cancel</button>
           </div>
           <p id="product-save-msg" class="text-sm text-center hidden"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── OUR STORY ─── -->
+    <div id="tab-our-story" class="tab-content hidden max-w-2xl">
+      <div class="card">
+        <h3 class="text-xl font-extrabold text-primary mb-2">Our Story</h3>
+        <p class="text-sm text-text-mid mb-6">Edit the image and blog shown in the homepage "Our Story" section. The image is uploaded to Cloudinary; the text is saved in Supabase.</p>
+
+        <div class="flex items-start gap-6 mb-6">
+          <div class="shrink-0">
+            <img id="story-current-img" src="" alt="Current story image" class="w-40 h-40 rounded-xl object-cover border border-primary/10 shadow hidden">
+            <div id="story-current-fallback" class="w-40 h-40 rounded-xl bg-secondary border border-dashed border-primary/20 flex items-center justify-center text-text-mid text-sm px-3 text-center">No image yet</div>
+          </div>
+          <div class="flex-1">
+            <label class="btn-outline text-sm px-4 py-2 cursor-pointer inline-block">
+              Choose photo
+              <input type="file" id="story-image-input" accept="image/*" class="hidden" onchange="handleStoryImageSelect(this)">
+            </label>
+            <p class="text-xs text-text-mid mt-2">JPG / PNG / WebP, max 5MB</p>
+            <p id="story-upload-progress" class="text-xs text-accent mt-2 hidden">Uploading…</p>
+            <p id="story-upload-hint" class="text-xs text-amber-600 mt-1 hidden">Set the Cloudinary story cloud name + unsigned preset in <code>supabase-config.js</code>.</p>
+            <p class="text-xs text-text-mid mt-1 hidden" id="story-new-file"></p>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="field-label">Established</label>
+            <input type="text" id="story-established" class="field" placeholder="Established 27 May 2022">
+          </div>
+          <div>
+            <label class="field-label">Heading</label>
+            <input type="text" id="story-heading" class="field" placeholder="OG Edibles — where relaxation meets the clouds">
+          </div>
+          <div>
+            <label class="field-label">Blog paragraphs</label>
+            <div id="story-paragraphs-list" class="space-y-2"></div>
+            <button type="button" onclick="addStoryParagraph()" class="btn-outline text-xs px-4 py-2 mt-2">+ Add paragraph</button>
+            <p class="text-xs text-text-mid mt-2">Add as many paragraphs as you like. Short paragraphs are easier to read on the homepage.</p>
+          </div>
+          <button type="button" id="story-save-btn" onclick="saveStoryContent()" class="btn-accent w-full py-3">Save changes</button>
+          <p id="story-save-msg" class="text-sm text-center hidden"></p>
         </div>
       </div>
     </div>
@@ -567,7 +612,7 @@
       l.classList.remove('active');
       if (l.getAttribute('onclick').includes(tabName)) l.classList.add('active');
     });
-    const titles = { overview:'Overview', products:'Products', categories:'Categories', orders:'Orders', reviews:'Reviews', 'add-product':'Add Product', profile:'Profile' };
+    const titles = { overview:'Overview', products:'Products', categories:'Categories', orders:'Orders', reviews:'Reviews', 'add-product':'Add Product', 'our-story':'Our Story', profile:'Profile' };
     document.getElementById('page-title').textContent = titles[tabName] || tabName;
     closeSidebar();
     if (tabName === 'overview') loadOverview();
@@ -576,6 +621,7 @@
     else if (tabName === 'orders') loadOrdersTable();
     else if (tabName === 'reviews') loadReviewsTable();
     else if (tabName === 'add-product' && !categoryOptionsLoaded) loadCategoryOptions();
+    else if (tabName === 'our-story') loadStoryEditor();
     else if (tabName === 'profile') fillProfileForm();
   }
 
@@ -681,6 +727,181 @@
   function closeSidebar() {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebar-backdrop').classList.add('hidden');
+  }
+
+  // ─── OUR STORY ───
+  let storyEditorData = null;
+  let pendingStoryImageFile = null;
+
+  function setStoryEditorImage(url) {
+    const img = document.getElementById('story-current-img');
+    const fallback = document.getElementById('story-current-fallback');
+    if (url) {
+      img.src = url;
+      img.classList.remove('hidden');
+      fallback.classList.add('hidden');
+    } else {
+      img.classList.add('hidden');
+      img.removeAttribute('src');
+      fallback.classList.remove('hidden');
+    }
+  }
+
+  async function loadStoryEditor() {
+    const msg = document.getElementById('story-save-msg');
+    msg.classList.add('hidden');
+    if (typeof cloudinaryStoryConfigured !== 'undefined' && !cloudinaryStoryConfigured) {
+      document.getElementById('story-upload-hint').classList.remove('hidden');
+    }
+    if (typeof cloudinaryConfigured !== 'undefined' && !cloudinaryConfigured) {
+      document.getElementById('story-upload-hint').classList.remove('hidden');
+    }
+    try {
+      let { data, error } = await supabaseClient
+        .from('site_content')
+        .select('*')
+        .eq('section', 'our-story')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        // No row yet (schema not migrated) — offer empty fields instead of
+        // failing silently; Save will upsert and create the row.
+        data = { section: 'our-story', image_url: null, established: '', heading: '', paragraphs: [] };
+      }
+      storyEditorData = data;
+      document.getElementById('story-established').value = data.established || '';
+      document.getElementById('story-heading').value = data.heading || '';
+      setStoryEditorImage(data.image_url || null);
+      renderStoryParagraphInputs(data.paragraphs || []);
+    } catch (e) {
+      console.error(e);
+      msg.textContent = 'Could not load story content. Check that the site_content table exists (run supabase/schema.sql).';
+      msg.className = 'text-sm text-center text-red-500 mt-3';
+      msg.classList.remove('hidden');
+    }
+  }
+
+  function renderStoryParagraphInputs(paragraphs) {
+    const list = document.getElementById('story-paragraphs-list');
+    list.innerHTML = '';
+    paragraphs.forEach((p, i) => {
+      list.appendChild(storyParagraphInput(p, i));
+    });
+    if (!paragraphs.length) addStoryParagraph();
+  }
+
+  function storyParagraphInput(value, index) {
+    const wrap = document.createElement('div');
+    wrap.className = 'flex gap-2 items-start';
+    wrap.dataset.index = index;
+    const textarea = document.createElement('textarea');
+    textarea.className = 'field flex-1';
+    textarea.rows = 2;
+    textarea.placeholder = 'Write a paragraph about your story…';
+    textarea.value = value || '';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn-danger text-xs px-3 py-2 mt-1 shrink-0';
+    remove.textContent = 'Remove';
+    remove.onclick = () => { wrap.remove(); };
+    wrap.appendChild(textarea);
+    wrap.appendChild(remove);
+    return wrap;
+  }
+
+  function addStoryParagraph() {
+    const list = document.getElementById('story-paragraphs-list');
+    list.appendChild(storyParagraphInput('', list.children.length));
+  }
+
+  function handleStoryImageSelect(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Max 5MB for the story image.');
+      input.value = '';
+      return;
+    }
+    pendingStoryImageFile = file;
+    const label = document.getElementById('story-new-file');
+    label.textContent = 'New photo: ' + file.name + ' (will upload on save)';
+    label.classList.remove('hidden');
+  }
+
+  function uploadStoryImageToCloudinary(file) {
+    if (typeof cloudinaryStoryConfigured === 'undefined' || !cloudinaryStoryConfigured) {
+      throw new Error('Cloudinary is not configured. Set cloudName and uploadPreset in supabase-config.js');
+    }
+    const form = new FormData();
+    form.append('file', file);
+    form.append('upload_preset', cloudinaryStoryConfig.uploadPreset);
+    if (cloudinaryStoryConfig.folder) form.append('folder', cloudinaryStoryConfig.folder);
+    return fetch(
+      `https://api.cloudinary.com/v1_1/${cloudinaryStoryConfig.cloudName}/image/upload`,
+      { method: 'POST', body: form }
+    ).then(async res => {
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || 'Cloudinary upload failed');
+      return json.secure_url;
+    });
+  }
+
+  async function saveStoryContent() {
+    const btn = document.getElementById('story-save-btn');
+    const msg = document.getElementById('story-save-msg');
+    const progress = document.getElementById('story-upload-progress');
+    msg.classList.add('hidden');
+
+    const paragraphs = Array.from(document.querySelectorAll('#story-paragraphs-list textarea'))
+      .map(t => t.value.trim())
+      .filter(Boolean);
+    if (!paragraphs.length) {
+      msg.textContent = 'Add at least one paragraph.';
+      msg.className = 'text-sm text-center text-red-500 mt-3';
+      msg.classList.remove('hidden');
+      return;
+    }
+
+    btn.disabled = true;
+    try {
+      let imageUrl = (storyEditorData && storyEditorData.image_url) || null;
+      if (pendingStoryImageFile) {
+        progress.classList.remove('hidden');
+        imageUrl = await uploadStoryImageToCloudinary(pendingStoryImageFile);
+        progress.classList.add('hidden');
+      }
+
+      const { error } = await supabaseClient
+        .from('site_content')
+        .upsert({
+          section: 'our-story',
+          image_url: imageUrl,
+          established: document.getElementById('story-established').value.trim() || '',
+          heading: document.getElementById('story-heading').value.trim() || '',
+          paragraphs
+        }, { onConflict: 'section' });
+      if (error) throw error;
+
+      storyEditorData = { ...storyEditorData, section: 'our-story', image_url: imageUrl,
+        established: document.getElementById('story-established').value.trim(),
+        heading: document.getElementById('story-heading').value.trim(),
+        paragraphs };
+      pendingStoryImageFile = null;
+      document.getElementById('story-image-input').value = '';
+      document.getElementById('story-new-file').classList.add('hidden');
+      setStoryEditorImage(imageUrl);
+
+      msg.textContent = 'Our Story section updated.';
+      msg.className = 'text-sm text-center text-green-600 mt-3';
+      msg.classList.remove('hidden');
+    } catch (e) {
+      console.error(e);
+      progress.classList.add('hidden');
+      msg.textContent = e.message || 'Could not save the story section.';
+      msg.className = 'text-sm text-center text-red-500 mt-3';
+      msg.classList.remove('hidden');
+    }
+    btn.disabled = false;
   }
 
   // ─── OVERVIEW ───

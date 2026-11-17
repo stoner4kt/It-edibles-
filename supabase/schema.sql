@@ -69,6 +69,19 @@ create table if not exists public.categories (
 create unique index if not exists categories_name_lower_key
   on public.categories (lower(name));
 
+-- ─── Site content (Our Story section) ───────────────────────
+-- Single row edited from the admin panel: the homepage "Our Story" image is
+-- uploaded to Cloudinary, the blog/paragraphs and headings are plain text.
+create table if not exists public.site_content (
+  id           uuid primary key default gen_random_uuid(),
+  section      text not null unique default 'our-story',
+  image_url    text,
+  established  text not null default '',
+  heading      text not null default '',
+  paragraphs   jsonb not null default '[]'::jsonb,
+  updated_at   timestamptz not null default now()
+);
+
 -- ─── Profiles (admin flags + avatar) ─────────────────────────
 create table if not exists public.profiles (
   id           uuid primary key references auth.users(id) on delete cascade,
@@ -89,6 +102,7 @@ alter table public.orders   enable row level security;
 alter table public.reviews  enable row level security;
 alter table public.profiles enable row level security;
 alter table public.categories enable row level security;
+alter table public.site_content enable row level security;
 
 -- ─── Admin helper (defined before any policy that calls it) ──
 create or replace function public.is_admin()
@@ -122,6 +136,16 @@ create policy "categories public read"
   on public.categories for select using (true);
 create policy "categories admin write"
   on public.categories for all
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- The storefront reads the Our Story content publicly; only admins edit it.
+drop policy if exists "site_content public read" on public.site_content;
+drop policy if exists "site_content admin write" on public.site_content;
+create policy "site_content public read"
+  on public.site_content for select using (true);
+create policy "site_content admin write"
+  on public.site_content for all
   using (public.is_admin())
   with check (public.is_admin());
 
@@ -212,6 +236,10 @@ drop trigger if exists categories_touch on public.categories;
 create trigger categories_touch before update on public.categories
   for each row execute function public.touch_updated_at();
 
+drop trigger if exists site_content_touch on public.site_content;
+create trigger site_content_touch before update on public.site_content
+  for each row execute function public.touch_updated_at();
+
 -- ─── Seed categories ─────────────────────────────────────────
 -- The ten the storefront used to hardcode, so an existing catalog keeps its
 -- filter bar and the product form stays populated.
@@ -237,6 +265,21 @@ where trim(p.category) <> ''
   and not exists (select 1 from public.categories c where c.slug = trim(p.category))
 group by trim(p.category)
 on conflict (slug) do nothing;
+
+-- ─── Seed site content (Our Story) ───────────────────────────
+-- The default homepage opening statement. The admin panel can edit it and the
+-- image at any time. image_url starts as the bundled prototype image.
+insert into public.site_content (section, image_url, established, heading, paragraphs)
+values (
+  'our-story',
+  'images/quality2.jpg',
+  'Established 27 May 2022',
+  'OG Edibles — where relaxation meets the clouds',
+  '["We created this space for the dreamers, the hustlers, and anyone who wants to clock out from the noise for a while. Our passion is connecting you with the finest cannabis products — crafted with care, delivered with discretion.",
+    "Whether you''re after relief from stress, a creative spark, or just a chill evening — we''ve got something for you. From premium flower to artisan edibles and infused beverages, everything is hand-picked for quality and consistency.",
+    "Our mission is simple: elevated experiences, every time. Real vibes. Good energy. No compromise."]'::jsonb
+)
+on conflict (section) do nothing;
 
 -- ─── Storage: product images ─────────────────────────────────
 -- Run this from the SQL editor as well; it allows public read of

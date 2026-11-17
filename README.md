@@ -25,6 +25,8 @@ og-edibles-1738/
 ├── netlify/functions/
 │   ├── save-data.js        → Checkout: order insert + Resend emails
 │   └── package.json
+├── supabase/migration-profile-avatar.sql → Adds profiles.avatar_url + display_name to existing projects
+├── supabase/migration-site-content.sql   → Adds site_content (Our Story editing) to existing projects
 └── images/                 → All product and brand images
 ```
 
@@ -125,6 +127,7 @@ Access at: `yoursite.com/admin.html`
 - **Products:** view all, update stock inline, edit/delete
 - **Orders:** view all, filter by status, update status
 - **Add Product:** upload a new product with image to the `product-images` bucket
+- **Our Story:** edit the homepage "Our Story" image (uploaded to Cloudinary) and blog/paragraphs, saved in `site_content`
 
 ---
 
@@ -136,6 +139,7 @@ Access at: `yoursite.com/admin.html`
 | `orders` | Placed orders (items stored as JSONB) | admin only |
 | `reviews` | Customer reviews | public read + insert, admin moderation |
 | `profiles` | One row per auth user, holds `is_admin` | own row read, admin all |
+| `site_content` | Homepage "Our Story" (image_url + blog paragraphs) | public read, admin write |
 
 `is_admin()` is `SECURITY DEFINER` so RLS policies can check the flag without recursing into
 the `profiles` policies.
