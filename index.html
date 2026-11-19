@@ -112,6 +112,31 @@
 
     /* Reviews */
     .review-card { border-left: 3px solid #A56CFF; background: #fff; border-radius: 16px; padding: 1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    .review-card-compact { border-left: 3px solid #A56CFF; background: #fff; border-radius: 16px; padding: 1rem 1.15rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); width: 300px; min-width: 300px; flex-shrink: 0; }
+
+    /* Floating auto-scroll reviews strip */
+    .reviews-marquee-wrap {
+      overflow: hidden;
+      mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+      margin-bottom: 2.5rem;
+    }
+    .reviews-marquee-track {
+      display: flex;
+      gap: 1rem;
+      width: max-content;
+      animation: reviewsMarquee 45s linear infinite;
+    }
+    .reviews-marquee-wrap:hover .reviews-marquee-track {
+      animation-play-state: paused;
+    }
+    @keyframes reviewsMarquee {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reviews-marquee-track { animation: none; flex-wrap: wrap; width: 100%; justify-content: center; }
+    }
 
     /* Reveal animation */
     .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
@@ -327,10 +352,14 @@
   <!-- REVIEWS -->
   <section id="reviews" class="py-20 bg-white">
     <div class="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
-      <div class="text-center mb-12 reveal">
+      <div class="text-center mb-10 reveal">
         <h2 class="text-4xl font-extrabold text-primary mb-4">Client Reviews</h2>
         <p class="text-text-mid">Real experiences from real customers.</p>
       </div>
+
+      <!-- Floating auto-scroll strip (latest reviews) -->
+      <div id="reviews-marquee" class="reviews-marquee-wrap hidden" aria-hidden="true"></div>
+
       <div id="reviews-layout">
         <p class="text-center text-text-mid py-8">Loading reviews…</p>
       </div>
@@ -345,16 +374,18 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
         <div class="reveal">
           <div class="rounded-2xl overflow-hidden shadow-2xl border border-primary/10 aspect-square bg-white">
-            <img src="images/quality2.jpg" alt="OG EDIBLES1738 brand" class="w-full h-full object-cover">
+            <img id="story-image" src="images/quality2.jpg" alt="OG EDIBLES1738 brand" class="w-full h-full object-cover">
           </div>
         </div>
         <div class="reveal">
-          <span class="text-xs uppercase tracking-widest text-accent font-semibold">Established 27 May 2022</span>
-          <h2 class="text-4xl font-extrabold text-primary mt-2 mb-6">OG Edibles — where relaxation meets the clouds</h2>
+          <span id="story-established" class="text-xs uppercase tracking-widest text-accent font-semibold">Established 27 May 2022</span>
+          <h2 id="story-heading" class="text-4xl font-extrabold text-primary mt-2 mb-6">OG Edibles — where relaxation meets the clouds</h2>
           <div class="space-y-4 text-text-mid leading-relaxed">
-            <p>We created this space for the dreamers, the hustlers, and anyone who wants to clock out from the noise for a while. Our passion is connecting you with the finest cannabis products — crafted with care, delivered with discretion.</p>
-            <p>Whether you're after relief from stress, a creative spark, or just a chill evening — we've got something for you. From premium flower to artisan edibles and infused beverages, everything is hand-picked for quality and consistency.</p>
-            <p>Our mission is simple: elevated experiences, every time. Real vibes. Good energy. No compromise.</p>
+            <div id="story-paragraphs">
+              <p>We created this space for the dreamers, the hustlers, and anyone who wants to clock out from the noise for a while. Our passion is connecting you with the finest cannabis products — crafted with care, delivered with discretion.</p>
+              <p>Whether you're after relief from stress, a creative spark, or just a chill evening — we've got something for you. From premium flower to artisan edibles and infused beverages, everything is hand-picked for quality and consistency.</p>
+              <p>Our mission is simple: elevated experiences, every time. Real vibes. Good energy. No compromise.</p>
+            </div>
             <div class="mt-6">
               <p class="font-semibold text-primary mb-3">OG Edibles is for:</p>
               <ul class="space-y-2">
@@ -511,8 +542,47 @@
     }
   }
 
-  // Load reviews
+  // ─── Our Story (editable from the admin panel) ───
+  // The "Our Story" image and blog come from the single site_content row so an
+  // admin can update them without touching the markup. Marked-up defaults in
+  // the HTML are kept as a fallback if the fetch fails.
+  async function loadStoryContent() {
+    const storyImg = document.getElementById('story-image');
+    const storyEst = document.getElementById('story-established');
+    const storyHeading = document.getElementById('story-heading');
+    const storyParagraphs = document.getElementById('story-paragraphs');
+    if (!storyImg || !storyEst || !storyHeading || !storyParagraphs) return;
+    if (!supabaseConfigured) return;
+    try {
+      const { data, error } = await supabaseClient
+        .from('site_content')
+        .select('image_url, established, heading, paragraphs')
+        .eq('section', 'our-story')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return;
+
+      if (data.image_url) storyImg.src = data.image_url;
+      if (data.established) storyEst.textContent = data.established;
+      if (data.heading) storyHeading.textContent = data.heading;
+      if (Array.isArray(data.paragraphs) && data.paragraphs.length) {
+        storyParagraphs.innerHTML = data.paragraphs
+          .filter(p => p && String(p).trim())
+          .map(p => `<p>${escHtml(p)}</p>`)
+          .join('');
+      }
+    } catch (e) {
+      console.error('Could not load Our Story content.', e);
+    }
+  }
+
+  // ─── Reviews (paginated + floating marquee) ───
   function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  const REVIEWS_PAGE_SIZE = 9;
+  let reviewsOffset = 0;
+  let reviewsHasMore = false;
+  let reviewsLoaded = [];
 
   function reviewCardHtml(r) {
     const stars = '★'.repeat(r.rating || 5) + '☆'.repeat(5 - (r.rating || 5));
@@ -524,6 +594,17 @@
       </div>
       <p class="text-text-mid text-sm leading-relaxed">${escHtml(r.comment || '')}</p>
       ${date ? `<p class="text-xs text-text-mid/60 mt-3">${date}</p>` : ''}
+    </div>`;
+  }
+
+  function reviewCardCompactHtml(r) {
+    const stars = '★'.repeat(r.rating || 5) + '☆'.repeat(5 - (r.rating || 5));
+    return `<div class="review-card-compact">
+      <div class="flex justify-between items-start mb-1.5 gap-2">
+        <p class="font-bold text-primary text-sm truncate">${escHtml(r.name || 'Customer')}</p>
+        <span class="text-accent text-xs shrink-0">${stars}</span>
+      </div>
+      <p class="text-text-mid text-xs leading-relaxed line-clamp-3">${escHtml(r.comment || '')}</p>
     </div>`;
   }
 
@@ -552,34 +633,94 @@
     </div>`;
   }
 
-  async function loadReviews() {
+  function renderReviewsMarquee(reviews) {
+    const wrap = document.getElementById('reviews-marquee');
+    if (!wrap) return;
+    if (!reviews || reviews.length < 2) {
+      wrap.classList.add('hidden');
+      wrap.innerHTML = '';
+      return;
+    }
+    // Duplicate the set so the CSS loop is seamless
+    const cards = reviews.map(reviewCardCompactHtml).join('');
+    wrap.innerHTML = `<div class="reviews-marquee-track">${cards}${cards}</div>`;
+    wrap.classList.remove('hidden');
+  }
+
+  function renderReviewsGrid() {
     const host = document.getElementById('reviews-layout');
-    if (!supabaseConfigured) {
+    if (!reviewsLoaded.length) {
       host.innerHTML = `<div class="max-w-xl mx-auto">${reviewFormHtml()}</div>`;
       bindReviewForm();
       return;
     }
-    try {
-      const { data: reviews, error } = await supabaseClient
-        .from('reviews')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(9);
-      if (error) throw error;
-      if (!reviews || reviews.length === 0) {
-        host.innerHTML = `<div class="max-w-xl mx-auto">${reviewFormHtml()}</div>`;
-      } else {
-        let cards = '';
-        reviews.forEach(r => { cards += reviewCardHtml(r); });
-        host.innerHTML = `
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">${cards}</div>
-          <div class="max-w-xl mx-auto">${reviewFormHtml()}</div>`;
-      }
+    const cards = reviewsLoaded.map(reviewCardHtml).join('');
+    const loadMore = reviewsHasMore
+      ? `<div class="text-center mt-8 mb-10">
+           <button id="load-more-reviews" class="btn-outline px-8 py-3">Load more reviews</button>
+         </div>`
+      : '';
+    host.innerHTML = `
+      <div id="reviews-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">${cards}</div>
+      ${loadMore}
+      <div class="max-w-xl mx-auto mt-4">${reviewFormHtml()}</div>`;
+    bindReviewForm();
+    document.getElementById('load-more-reviews')?.addEventListener('click', () => loadMoreReviews());
+  }
+
+  async function fetchReviewsPage(from) {
+    const to = from + REVIEWS_PAGE_SIZE - 1;
+    const { data, error } = await supabaseClient
+      .from('reviews')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function loadReviews(reset = true) {
+    const host = document.getElementById('reviews-layout');
+    if (!supabaseConfigured) {
+      document.getElementById('reviews-marquee')?.classList.add('hidden');
+      host.innerHTML = `<div class="max-w-xl mx-auto">${reviewFormHtml()}</div>`;
       bindReviewForm();
+      return;
+    }
+    if (reset) {
+      reviewsOffset = 0;
+      reviewsLoaded = [];
+      host.innerHTML = '<p class="text-center text-text-mid py-8">Loading reviews…</p>';
+    }
+    try {
+      const page = await fetchReviewsPage(reviewsOffset);
+      reviewsHasMore = page.length === REVIEWS_PAGE_SIZE;
+      reviewsLoaded = reviewsLoaded.concat(page);
+      reviewsOffset += page.length;
+
+      // Marquee uses the newest batch (first page) for a light floating strip
+      if (reset) renderReviewsMarquee(page);
+
+      renderReviewsGrid();
     } catch (e) {
-      host.innerHTML = supabaseConfigured
-        ? '<p class="text-center text-red-500">Failed to load reviews.</p>'
-        : '<p class="text-center text-text-mid">Reviews will appear once Supabase is configured.</p>';
+      console.error(e);
+      host.innerHTML = '<p class="text-center text-red-500">Failed to load reviews.</p>';
+    }
+  }
+
+  async function loadMoreReviews() {
+    const btn = document.getElementById('load-more-reviews');
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+    try {
+      const page = await fetchReviewsPage(reviewsOffset);
+      reviewsHasMore = page.length === REVIEWS_PAGE_SIZE;
+      reviewsLoaded = reviewsLoaded.concat(page);
+      reviewsOffset += page.length;
+      renderReviewsGrid();
+    } catch (e) {
+      console.error(e);
+      if (btn) { btn.disabled = false; btn.textContent = 'Load more reviews'; }
+      alert('Could not load more reviews. Please try again.');
     }
   }
 
@@ -605,7 +746,7 @@
         msg.textContent = 'Thank you! Your review has been submitted.';
         msg.className = 'text-center text-sm mt-3 text-green-600';
         msg.classList.remove('hidden');
-        setTimeout(() => loadReviews(), 1500);
+        setTimeout(() => loadReviews(true), 1200);
       } catch (e) {
         msg.textContent = 'Failed to submit. Try again.';
         msg.className = 'text-center text-sm mt-3 text-red-500';
@@ -617,7 +758,8 @@
   }
 
   loadFeaturedProducts();
-  loadReviews();
+  loadStoryContent();
+  loadReviews(true);
 </script>
 </body>
 </html>

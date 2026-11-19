@@ -138,6 +138,8 @@
     <div class="sidebar-link" onclick="showTab('orders')"><span class="icon">📦</span> Orders</div>
     <div class="sidebar-link" onclick="showTab('reviews')"><span class="icon">⭐</span> Reviews</div>
     <div class="sidebar-link" onclick="showTab('add-product')"><span class="icon">➕</span> Add Product</div>
+    <div class="sidebar-link" onclick="showTab('our-story')"><span class="icon">📖</span> Our Story</div>
+    <div class="sidebar-link" onclick="showTab('profile')"><span class="icon">👤</span> Profile</div>
   </nav>
   <div class="absolute bottom-6 left-0 right-0 px-4">
     <button onclick="adminLogout()" class="w-full text-white/60 hover:text-white text-sm flex items-center gap-2 p-3 rounded-lg hover:bg-white/10 transition">
@@ -162,7 +164,10 @@
     </div>
     <div class="flex items-center gap-3">
       <span id="admin-name" class="text-sm text-text-mid hidden sm:block"></span>
-      <div class="w-9 h-9 rounded-full bg-accent flex items-center justify-center text-white font-bold text-sm">A</div>
+      <button type="button" onclick="showTab('profile')" title="Edit profile" class="p-0 border-0 bg-transparent cursor-pointer">
+        <img id="admin-avatar" src="" alt="" class="w-9 h-9 rounded-full object-cover border-2 border-accent/40 hidden">
+        <div id="admin-avatar-fallback" class="w-9 h-9 rounded-full bg-accent flex items-center justify-center text-white font-bold text-sm">A</div>
+      </button>
     </div>
   </div>
 
@@ -346,6 +351,86 @@
       </div>
     </div>
 
+    <!-- ─── OUR STORY ─── -->
+    <div id="tab-our-story" class="tab-content hidden max-w-2xl">
+      <div class="card">
+        <h3 class="text-xl font-extrabold text-primary mb-2">Our Story</h3>
+        <p class="text-sm text-text-mid mb-6">Edit the image and blog shown in the homepage "Our Story" section. The image is uploaded to Cloudinary; the text is saved in Supabase.</p>
+
+        <div class="flex items-start gap-6 mb-6">
+          <div class="shrink-0">
+            <img id="story-current-img" src="" alt="Current story image" class="w-40 h-40 rounded-xl object-cover border border-primary/10 shadow hidden">
+            <div id="story-current-fallback" class="w-40 h-40 rounded-xl bg-secondary border border-dashed border-primary/20 flex items-center justify-center text-text-mid text-sm px-3 text-center">No image yet</div>
+          </div>
+          <div class="flex-1">
+            <label class="btn-outline text-sm px-4 py-2 cursor-pointer inline-block">
+              Choose photo
+              <input type="file" id="story-image-input" accept="image/*" class="hidden" onchange="handleStoryImageSelect(this)">
+            </label>
+            <p class="text-xs text-text-mid mt-2">JPG / PNG / WebP, max 5MB</p>
+            <p id="story-upload-progress" class="text-xs text-accent mt-2 hidden">Uploading…</p>
+            <p id="story-upload-hint" class="text-xs text-amber-600 mt-1 hidden">Set the Cloudinary story cloud name + unsigned preset in <code>supabase-config.js</code>.</p>
+            <p class="text-xs text-text-mid mt-1 hidden" id="story-new-file"></p>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="field-label">Established</label>
+            <input type="text" id="story-established" class="field" placeholder="Established 27 May 2022">
+          </div>
+          <div>
+            <label class="field-label">Heading</label>
+            <input type="text" id="story-heading" class="field" placeholder="OG Edibles — where relaxation meets the clouds">
+          </div>
+          <div>
+            <label class="field-label">Blog paragraphs</label>
+            <div id="story-paragraphs-list" class="space-y-2"></div>
+            <button type="button" onclick="addStoryParagraph()" class="btn-outline text-xs px-4 py-2 mt-2">+ Add paragraph</button>
+            <p class="text-xs text-text-mid mt-2">Add as many paragraphs as you like. Short paragraphs are easier to read on the homepage.</p>
+          </div>
+          <button type="button" id="story-save-btn" onclick="saveStoryContent()" class="btn-accent w-full py-3">Save changes</button>
+          <p id="story-save-msg" class="text-sm text-center hidden"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── PROFILE ─── -->
+    <div id="tab-profile" class="tab-content hidden max-w-xl">
+      <div class="card">
+        <h3 class="text-xl font-extrabold text-primary mb-2">Your Profile</h3>
+        <p class="text-sm text-text-mid mb-6">Update how you appear in the admin panel. Avatar is uploaded to Cloudinary.</p>
+
+        <div class="flex items-center gap-5 mb-6">
+          <div class="relative">
+            <img id="profile-avatar-preview" src="" alt="Avatar" class="w-24 h-24 rounded-full object-cover border-4 border-secondary shadow hidden">
+            <div id="profile-avatar-fallback" class="w-24 h-24 rounded-full bg-accent flex items-center justify-center text-white text-3xl font-bold">A</div>
+          </div>
+          <div>
+            <label class="btn-outline text-sm px-4 py-2 cursor-pointer inline-block">
+              Choose photo
+              <input type="file" id="profile-avatar-input" accept="image/*" class="hidden" onchange="handleProfileAvatarSelect(this)">
+            </label>
+            <p class="text-xs text-text-mid mt-2">JPG / PNG / WebP, max 5MB</p>
+            <p id="profile-avatar-hint" class="text-xs text-amber-600 mt-1 hidden">Set Cloudinary cloud name + unsigned preset in <code>supabase-config.js</code>.</p>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="field-label">Display name</label>
+            <input type="text" id="profile-display-name" class="field" placeholder="How you want to be shown">
+          </div>
+          <div>
+            <label class="field-label">Email</label>
+            <input type="email" id="profile-email" class="field" disabled>
+          </div>
+          <button type="button" id="profile-save-btn" onclick="saveProfile()" class="btn-accent w-full py-3">Save profile</button>
+          <p id="profile-save-msg" class="text-sm text-center hidden"></p>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -396,13 +481,70 @@
       showLoginError('Access denied. Not an admin account.');
       return;
     }
-    enterDashboard(user.email);
+    const profile = await loadAdminProfile(user);
+    enterDashboard(user.email, profile);
   }
 
-  function enterDashboard(email) {
+  let currentAdminProfile = null;
+  let pendingAvatarFile = null;
+  let pendingAvatarPreviewUrl = null;
+
+  function setTopbarAvatar(avatarUrl, email) {
+    const img = document.getElementById('admin-avatar');
+    const fallback = document.getElementById('admin-avatar-fallback');
+    const initial = (email || 'A').charAt(0).toUpperCase();
+    if (avatarUrl) {
+      img.src = avatarUrl;
+      img.classList.remove('hidden');
+      fallback.classList.add('hidden');
+    } else {
+      img.classList.add('hidden');
+      img.removeAttribute('src');
+      fallback.textContent = initial;
+      fallback.classList.remove('hidden');
+    }
+  }
+
+  function setProfileFormAvatar(avatarUrl, email) {
+    const img = document.getElementById('profile-avatar-preview');
+    const fallback = document.getElementById('profile-avatar-fallback');
+    const initial = (email || 'A').charAt(0).toUpperCase();
+    if (avatarUrl) {
+      img.src = avatarUrl;
+      img.classList.remove('hidden');
+      fallback.classList.add('hidden');
+    } else {
+      img.classList.add('hidden');
+      img.removeAttribute('src');
+      fallback.textContent = initial;
+      fallback.classList.remove('hidden');
+    }
+  }
+
+  async function loadAdminProfile(user) {
+    if (!user) return null;
+    const { data, error } = await supabaseClient
+      .from('profiles')
+      .select('id, email, display_name, avatar_url, is_admin')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (error) {
+      console.error('profile load failed', error);
+      return { id: user.id, email: user.email, display_name: null, avatar_url: null };
+    }
+    return data || { id: user.id, email: user.email, display_name: null, avatar_url: null };
+  }
+
+  function enterDashboard(email, profile) {
     document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('admin-name').textContent = email;
+    currentAdminProfile = profile || null;
+    const label = (profile && profile.display_name) || email;
+    document.getElementById('admin-name').textContent = label;
     document.getElementById('admin-name').classList.remove('hidden');
+    setTopbarAvatar(profile && profile.avatar_url, email);
+    if (typeof cloudinaryConfigured !== 'undefined' && !cloudinaryConfigured) {
+      document.getElementById('profile-avatar-hint')?.classList.remove('hidden');
+    }
     loadDashboard();
   }
 
@@ -470,7 +612,7 @@
       l.classList.remove('active');
       if (l.getAttribute('onclick').includes(tabName)) l.classList.add('active');
     });
-    const titles = { overview:'Overview', products:'Products', categories:'Categories', orders:'Orders', reviews:'Reviews', 'add-product':'Add Product' };
+    const titles = { overview:'Overview', products:'Products', categories:'Categories', orders:'Orders', reviews:'Reviews', 'add-product':'Add Product', 'our-story':'Our Story', profile:'Profile' };
     document.getElementById('page-title').textContent = titles[tabName] || tabName;
     closeSidebar();
     if (tabName === 'overview') loadOverview();
@@ -479,6 +621,103 @@
     else if (tabName === 'orders') loadOrdersTable();
     else if (tabName === 'reviews') loadReviewsTable();
     else if (tabName === 'add-product' && !categoryOptionsLoaded) loadCategoryOptions();
+    else if (tabName === 'our-story') loadStoryEditor();
+    else if (tabName === 'profile') fillProfileForm();
+  }
+
+  function fillProfileForm() {
+    const p = currentAdminProfile || {};
+    document.getElementById('profile-display-name').value = p.display_name || '';
+    document.getElementById('profile-email').value = p.email || document.getElementById('admin-name').textContent || '';
+    setProfileFormAvatar(pendingAvatarPreviewUrl || p.avatar_url, p.email);
+    document.getElementById('profile-save-msg').classList.add('hidden');
+  }
+
+  function handleProfileAvatarSelect(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Max 5MB for profile photos.');
+      input.value = '';
+      return;
+    }
+    if (pendingAvatarPreviewUrl) URL.revokeObjectURL(pendingAvatarPreviewUrl);
+    pendingAvatarFile = file;
+    pendingAvatarPreviewUrl = URL.createObjectURL(file);
+    setProfileFormAvatar(pendingAvatarPreviewUrl, currentAdminProfile && currentAdminProfile.email);
+  }
+
+  async function uploadAvatarToCloudinary(file) {
+    if (typeof cloudinaryConfigured === 'undefined' || !cloudinaryConfigured) {
+      throw new Error('Cloudinary is not configured. Set cloudName and uploadPreset in supabase-config.js');
+    }
+    const form = new FormData();
+    form.append('file', file);
+    form.append('upload_preset', cloudinaryConfig.uploadPreset);
+    if (cloudinaryConfig.folder) form.append('folder', cloudinaryConfig.folder);
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`,
+      { method: 'POST', body: form }
+    );
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error?.message || 'Cloudinary upload failed');
+    return json.secure_url;
+  }
+
+  async function saveProfile() {
+    const btn = document.getElementById('profile-save-btn');
+    const msg = document.getElementById('profile-save-msg');
+    msg.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+
+      let avatarUrl = currentAdminProfile?.avatar_url || null;
+      if (pendingAvatarFile) {
+        btn.textContent = 'Uploading photo…';
+        avatarUrl = await uploadAvatarToCloudinary(pendingAvatarFile);
+      }
+
+      const displayName = document.getElementById('profile-display-name').value.trim() || null;
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .update({
+          display_name: displayName,
+          avatar_url: avatarUrl,
+          email: user.email
+        })
+        .eq('id', user.id)
+        .select('id, email, display_name, avatar_url, is_admin')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error('Profile was not updated. Check that profiles.avatar_url exists and you are an admin.');
+
+      currentAdminProfile = data;
+      pendingAvatarFile = null;
+      if (pendingAvatarPreviewUrl) {
+        URL.revokeObjectURL(pendingAvatarPreviewUrl);
+        pendingAvatarPreviewUrl = null;
+      }
+      document.getElementById('profile-avatar-input').value = '';
+
+      const label = data.display_name || data.email || user.email;
+      document.getElementById('admin-name').textContent = label;
+      setTopbarAvatar(data.avatar_url, data.email || user.email);
+      setProfileFormAvatar(data.avatar_url, data.email || user.email);
+
+      msg.textContent = 'Profile saved.';
+      msg.className = 'text-sm text-center text-green-600 mt-3';
+      msg.classList.remove('hidden');
+    } catch (e) {
+      console.error(e);
+      msg.textContent = e.message || 'Could not save profile.';
+      msg.className = 'text-sm text-center text-red-500 mt-3';
+      msg.classList.remove('hidden');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Save profile';
   }
 
   function openSidebar() {
@@ -488,6 +727,181 @@
   function closeSidebar() {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebar-backdrop').classList.add('hidden');
+  }
+
+  // ─── OUR STORY ───
+  let storyEditorData = null;
+  let pendingStoryImageFile = null;
+
+  function setStoryEditorImage(url) {
+    const img = document.getElementById('story-current-img');
+    const fallback = document.getElementById('story-current-fallback');
+    if (url) {
+      img.src = url;
+      img.classList.remove('hidden');
+      fallback.classList.add('hidden');
+    } else {
+      img.classList.add('hidden');
+      img.removeAttribute('src');
+      fallback.classList.remove('hidden');
+    }
+  }
+
+  async function loadStoryEditor() {
+    const msg = document.getElementById('story-save-msg');
+    msg.classList.add('hidden');
+    if (typeof cloudinaryStoryConfigured !== 'undefined' && !cloudinaryStoryConfigured) {
+      document.getElementById('story-upload-hint').classList.remove('hidden');
+    }
+    if (typeof cloudinaryConfigured !== 'undefined' && !cloudinaryConfigured) {
+      document.getElementById('story-upload-hint').classList.remove('hidden');
+    }
+    try {
+      let { data, error } = await supabaseClient
+        .from('site_content')
+        .select('*')
+        .eq('section', 'our-story')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        // No row yet (schema not migrated) — offer empty fields instead of
+        // failing silently; Save will upsert and create the row.
+        data = { section: 'our-story', image_url: null, established: '', heading: '', paragraphs: [] };
+      }
+      storyEditorData = data;
+      document.getElementById('story-established').value = data.established || '';
+      document.getElementById('story-heading').value = data.heading || '';
+      setStoryEditorImage(data.image_url || null);
+      renderStoryParagraphInputs(data.paragraphs || []);
+    } catch (e) {
+      console.error(e);
+      msg.textContent = 'Could not load story content. Check that the site_content table exists (run supabase/schema.sql).';
+      msg.className = 'text-sm text-center text-red-500 mt-3';
+      msg.classList.remove('hidden');
+    }
+  }
+
+  function renderStoryParagraphInputs(paragraphs) {
+    const list = document.getElementById('story-paragraphs-list');
+    list.innerHTML = '';
+    paragraphs.forEach((p, i) => {
+      list.appendChild(storyParagraphInput(p, i));
+    });
+    if (!paragraphs.length) addStoryParagraph();
+  }
+
+  function storyParagraphInput(value, index) {
+    const wrap = document.createElement('div');
+    wrap.className = 'flex gap-2 items-start';
+    wrap.dataset.index = index;
+    const textarea = document.createElement('textarea');
+    textarea.className = 'field flex-1';
+    textarea.rows = 2;
+    textarea.placeholder = 'Write a paragraph about your story…';
+    textarea.value = value || '';
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn-danger text-xs px-3 py-2 mt-1 shrink-0';
+    remove.textContent = 'Remove';
+    remove.onclick = () => { wrap.remove(); };
+    wrap.appendChild(textarea);
+    wrap.appendChild(remove);
+    return wrap;
+  }
+
+  function addStoryParagraph() {
+    const list = document.getElementById('story-paragraphs-list');
+    list.appendChild(storyParagraphInput('', list.children.length));
+  }
+
+  function handleStoryImageSelect(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Max 5MB for the story image.');
+      input.value = '';
+      return;
+    }
+    pendingStoryImageFile = file;
+    const label = document.getElementById('story-new-file');
+    label.textContent = 'New photo: ' + file.name + ' (will upload on save)';
+    label.classList.remove('hidden');
+  }
+
+  function uploadStoryImageToCloudinary(file) {
+    if (typeof cloudinaryStoryConfigured === 'undefined' || !cloudinaryStoryConfigured) {
+      throw new Error('Cloudinary is not configured. Set cloudName and uploadPreset in supabase-config.js');
+    }
+    const form = new FormData();
+    form.append('file', file);
+    form.append('upload_preset', cloudinaryStoryConfig.uploadPreset);
+    if (cloudinaryStoryConfig.folder) form.append('folder', cloudinaryStoryConfig.folder);
+    return fetch(
+      `https://api.cloudinary.com/v1_1/${cloudinaryStoryConfig.cloudName}/image/upload`,
+      { method: 'POST', body: form }
+    ).then(async res => {
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || 'Cloudinary upload failed');
+      return json.secure_url;
+    });
+  }
+
+  async function saveStoryContent() {
+    const btn = document.getElementById('story-save-btn');
+    const msg = document.getElementById('story-save-msg');
+    const progress = document.getElementById('story-upload-progress');
+    msg.classList.add('hidden');
+
+    const paragraphs = Array.from(document.querySelectorAll('#story-paragraphs-list textarea'))
+      .map(t => t.value.trim())
+      .filter(Boolean);
+    if (!paragraphs.length) {
+      msg.textContent = 'Add at least one paragraph.';
+      msg.className = 'text-sm text-center text-red-500 mt-3';
+      msg.classList.remove('hidden');
+      return;
+    }
+
+    btn.disabled = true;
+    try {
+      let imageUrl = (storyEditorData && storyEditorData.image_url) || null;
+      if (pendingStoryImageFile) {
+        progress.classList.remove('hidden');
+        imageUrl = await uploadStoryImageToCloudinary(pendingStoryImageFile);
+        progress.classList.add('hidden');
+      }
+
+      const { error } = await supabaseClient
+        .from('site_content')
+        .upsert({
+          section: 'our-story',
+          image_url: imageUrl,
+          established: document.getElementById('story-established').value.trim() || '',
+          heading: document.getElementById('story-heading').value.trim() || '',
+          paragraphs
+        }, { onConflict: 'section' });
+      if (error) throw error;
+
+      storyEditorData = { ...storyEditorData, section: 'our-story', image_url: imageUrl,
+        established: document.getElementById('story-established').value.trim(),
+        heading: document.getElementById('story-heading').value.trim(),
+        paragraphs };
+      pendingStoryImageFile = null;
+      document.getElementById('story-image-input').value = '';
+      document.getElementById('story-new-file').classList.add('hidden');
+      setStoryEditorImage(imageUrl);
+
+      msg.textContent = 'Our Story section updated.';
+      msg.className = 'text-sm text-center text-green-600 mt-3';
+      msg.classList.remove('hidden');
+    } catch (e) {
+      console.error(e);
+      progress.classList.add('hidden');
+      msg.textContent = e.message || 'Could not save the story section.';
+      msg.className = 'text-sm text-center text-red-500 mt-3';
+      msg.classList.remove('hidden');
+    }
+    btn.disabled = false;
   }
 
   // ─── OVERVIEW ───
